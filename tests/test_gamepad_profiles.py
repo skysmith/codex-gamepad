@@ -18,7 +18,11 @@ from scripts.configure_gamepad_profiles import (
     CODEX_PROFILE_NAME,
     DEVICE_IDENTIFIERS,
     GAME_PROFILE_NAME,
+    LEGACY_RECEIVER_RULE_DESCRIPTION,
     MANAGED_PROFILE_NAMES,
+    NAVIGATION_RULE_DESCRIPTION,
+    RECEIVER_RULE_DESCRIPTION,
+    SHELL_FALLBACK_RULE_DESCRIPTION,
     STATE_VERSION,
     ConfigurationError,
     check_configure_path,
@@ -52,7 +56,61 @@ def write_config(path: Path, config: dict) -> None:
     path.write_text(json.dumps(config), encoding="utf-8")
 
 
+def managed_rule(description: str, marker: str) -> dict:
+    return {
+        "description": description,
+        "manipulators": [
+            {
+                "type": "basic",
+                "from": {"key_code": "f1"},
+                "to": [{"key_code": "f2", "test_marker": marker}],
+            }
+        ],
+    }
+
+
+def write_rules_file(path: Path) -> dict:
+    navigation = managed_rule(NAVIGATION_RULE_DESCRIPTION, "fresh-navigation")
+    receiver = managed_rule(RECEIVER_RULE_DESCRIPTION, "fresh-receiver")
+    shell_fallback = managed_rule(
+        SHELL_FALLBACK_RULE_DESCRIPTION,
+        "fresh-shell-fallback",
+    )
+    asset = {
+        "title": "Codex Gamepad",
+        "rules": [
+            navigation,
+            receiver,
+            shell_fallback,
+            managed_rule("Unmanaged asset rule", "ignore-me"),
+        ],
+    }
+    write_config(path, asset)
+    return {
+        NAVIGATION_RULE_DESCRIPTION: navigation,
+        RECEIVER_RULE_DESCRIPTION: receiver,
+        SHELL_FALLBACK_RULE_DESCRIPTION: shell_fallback,
+    }
+
+
 class GamepadProfileConfigurationTests(unittest.TestCase):
+    def test_receiver_rule_descriptions_keep_the_public_name_and_migrate_the_preview_name(
+        self,
+    ) -> None:
+        self.assertEqual(
+            RECEIVER_RULE_DESCRIPTION,
+            "Codex Gamepad — Kokoro speak/stop (Karabiner 16 receiver)",
+        )
+        self.assertEqual(
+            LEGACY_RECEIVER_RULE_DESCRIPTION,
+            "Codex Gamepad — receiver actions (dictation + Kokoro; Karabiner 16)",
+        )
+        self.assertEqual(
+            SHELL_FALLBACK_RULE_DESCRIPTION,
+            "Codex Gamepad — Kokoro speak/stop "
+            "(legacy shell fallback; do not enable with receiver rule)",
+        )
+
     def test_creates_profiles_from_selected_profile_and_preserves_unrelated_data(self) -> None:
         keyboard = {
             "identifiers": {"is_keyboard": True, "product_id": 22, "vendor_id": 11},
@@ -147,6 +205,322 @@ class GamepadProfileConfigurationTests(unittest.TestCase):
             self.assertEqual(config_path.read_bytes(), original)
             self.assertFalse(state_path.exists())
             self.assertFalse(state_path.parent.exists())
+
+    def test_rules_file_refreshes_enabled_rules_and_migrates_receiver(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "karabiner.json"
+            state_path = root / "ownership.json"
+            rules_path = root / "codex-gamepad.json"
+            old_navigation = managed_rule(NAVIGATION_RULE_DESCRIPTION, "old-navigation")
+            preview_receiver = managed_rule(
+                LEGACY_RECEIVER_RULE_DESCRIPTION,
+                "preview-receiver",
+            )
+            stale_public_receiver = managed_rule(
+                RECEIVER_RULE_DESCRIPTION,
+                "stale-public-receiver",
+            )
+            unrelated_rule = managed_rule("Keep this rule", "unrelated")
+            write_config(
+                config_path,
+                {
+                    "global": {"show_in_menu_bar": False},
+                    "profiles": [
+                        {
+                            "name": "Default",
+                            "selected": True,
+                            "custom": {"preserve": True},
+                            "complex_modifications": {
+                                "parameters": {"basic.to_if_alone_timeout_milliseconds": 999},
+                                "rules": [
+                                    old_navigation,
+                                    unrelated_rule,
+                                    preview_receiver,
+                                    stale_public_receiver,
+                                ],
+                            },
+                        },
+                        {"name": "Work", "selected": False, "work_setting": 42},
+                    ],
+                },
+            )
+            configure_path(config_path, state_path)
+            before_refresh = json.loads(config_path.read_text(encoding="utf-8"))
+            expected_rules = write_rules_file(rules_path)
+
+            self.assertTrue(
+                configure_path(
+                    config_path,
+                    state_path,
+                    rules_file=rules_path,
+                )
+            )
+
+            configured = json.loads(config_path.read_text(encoding="utf-8"))
+            codex = profile_named(configured, CODEX_PROFILE_NAME)
+            game = profile_named(configured, GAME_PROFILE_NAME)
+            codex_rules = codex["complex_modifications"]["rules"]
+            self.assertEqual(
+                [rule["description"] for rule in codex_rules],
+                [
+                    NAVIGATION_RULE_DESCRIPTION,
+                    "Keep this rule",
+                    RECEIVER_RULE_DESCRIPTION,
+                ],
+            )
+            self.assertEqual(codex_rules[0], expected_rules[NAVIGATION_RULE_DESCRIPTION])
+            self.assertEqual(codex_rules[1], unrelated_rule)
+            self.assertEqual(codex_rules[2], expected_rules[RECEIVER_RULE_DESCRIPTION])
+            self.assertEqual(
+                codex["complex_modifications"]["parameters"],
+                {"basic.to_if_alone_timeout_milliseconds": 999},
+            )
+            self.assertEqual(codex["custom"], {"preserve": True})
+            self.assertEqual(
+                profile_named(configured, "Work"),
+                profile_named(before_refresh, "Work"),
+            )
+            expected_game = copy.deepcopy(codex)
+            expected_game["name"] = GAME_PROFILE_NAME
+            expected_game["selected"] = False
+            target_device(expected_game)["ignore"] = True
+            self.assertEqual(game, expected_game)
+
+    def test_rules_file_does_not_enable_absent_managed_rules(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "karabiner.json"
+            state_path = root / "ownership.json"
+            rules_path = root / "codex-gamepad.json"
+            unrelated_rule = managed_rule("Keep this rule", "unrelated")
+            write_config(
+                config_path,
+                {
+                    "profiles": [
+                        {
+                            "name": "Default",
+                            "selected": True,
+                            "complex_modifications": {"rules": [unrelated_rule]},
+                        }
+                    ]
+                },
+            )
+            configure_path(config_path, state_path)
+            before_refresh = config_path.read_bytes()
+            write_rules_file(rules_path)
+
+            self.assertFalse(
+                configure_path(
+                    config_path,
+                    state_path,
+                    rules_file=rules_path,
+                )
+            )
+            self.assertEqual(config_path.read_bytes(), before_refresh)
+            configured = json.loads(before_refresh)
+            for name in (CODEX_PROFILE_NAME, GAME_PROFILE_NAME):
+                self.assertEqual(
+                    profile_named(configured, name)["complex_modifications"]["rules"],
+                    [unrelated_rule],
+                )
+
+    def test_rules_file_refreshes_an_enabled_shell_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "karabiner.json"
+            state_path = root / "ownership.json"
+            rules_path = root / "codex-gamepad.json"
+            stale_fallback = managed_rule(
+                SHELL_FALLBACK_RULE_DESCRIPTION,
+                "old-l4-r4-fallback",
+            )
+            unrelated_rule = managed_rule("Keep this rule", "unrelated")
+            write_config(
+                config_path,
+                {
+                    "profiles": [
+                        {
+                            "name": "Default",
+                            "selected": True,
+                            "complex_modifications": {
+                                "rules": [unrelated_rule, stale_fallback]
+                            },
+                        }
+                    ]
+                },
+            )
+            configure_path(config_path, state_path)
+            expected_rules = write_rules_file(rules_path)
+
+            self.assertTrue(
+                configure_path(
+                    config_path,
+                    state_path,
+                    rules_file=rules_path,
+                )
+            )
+
+            configured = json.loads(config_path.read_text(encoding="utf-8"))
+            for name in (CODEX_PROFILE_NAME, GAME_PROFILE_NAME):
+                rules = profile_named(configured, name)["complex_modifications"]["rules"]
+                self.assertEqual(rules[0], unrelated_rule)
+                self.assertEqual(
+                    rules[1],
+                    expected_rules[SHELL_FALLBACK_RULE_DESCRIPTION],
+                )
+
+    def test_rules_file_check_is_read_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "karabiner.json"
+            state_path = root / "ownership.json"
+            rules_path = root / "codex-gamepad.json"
+            write_config(
+                config_path,
+                {
+                    "profiles": [
+                        {
+                            "name": "Default",
+                            "selected": True,
+                            "complex_modifications": {
+                                "rules": [
+                                    managed_rule(
+                                        LEGACY_RECEIVER_RULE_DESCRIPTION,
+                                        "old-receiver",
+                                    )
+                                ]
+                            },
+                        }
+                    ]
+                },
+            )
+            configure_path(config_path, state_path)
+            write_rules_file(rules_path)
+            original_config = config_path.read_bytes()
+            original_state = state_path.read_bytes()
+
+            self.assertTrue(
+                check_configure_path(
+                    config_path,
+                    state_path,
+                    rules_file=rules_path,
+                )
+            )
+            self.assertEqual(config_path.read_bytes(), original_config)
+            self.assertEqual(state_path.read_bytes(), original_state)
+
+    def test_malformed_rules_file_is_refused_before_any_write(self) -> None:
+        valid_navigation = managed_rule(NAVIGATION_RULE_DESCRIPTION, "navigation")
+        valid_receiver = managed_rule(RECEIVER_RULE_DESCRIPTION, "receiver")
+        malformed_assets = {
+            "invalid JSON": b"{not-json",
+            "non-list rules": json.dumps({"rules": {}}).encode(),
+            "missing receiver": json.dumps({"rules": [valid_navigation]}).encode(),
+            "duplicate receiver": json.dumps(
+                {"rules": [valid_navigation, valid_receiver, valid_receiver]}
+            ).encode(),
+            "non-object rule": json.dumps(
+                {"rules": [valid_navigation, valid_receiver, "bad"]}
+            ).encode(),
+            "empty manipulators": json.dumps(
+                {
+                    "rules": [
+                        valid_navigation,
+                        {
+                            "description": RECEIVER_RULE_DESCRIPTION,
+                            "manipulators": [],
+                        },
+                    ]
+                }
+            ).encode(),
+        }
+        for label, contents in malformed_assets.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                config_path = root / "karabiner.json"
+                state_path = root / "ownership.json"
+                rules_path = root / "codex-gamepad.json"
+                write_config(
+                    config_path,
+                    {"profiles": [{"name": "Default", "selected": True}]},
+                )
+                original = config_path.read_bytes()
+                rules_path.write_bytes(contents)
+
+                with self.assertRaises(ConfigurationError):
+                    configure_path(
+                        config_path,
+                        state_path,
+                        rules_file=rules_path,
+                    )
+                self.assertEqual(config_path.read_bytes(), original)
+                self.assertFalse(state_path.exists())
+
+    def test_symlink_rules_file_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "karabiner.json"
+            state_path = root / "ownership.json"
+            real_rules_path = root / "real-rules.json"
+            rules_path = root / "rules-link.json"
+            write_config(
+                config_path,
+                {"profiles": [{"name": "Default", "selected": True}]},
+            )
+            write_rules_file(real_rules_path)
+            rules_path.symlink_to(real_rules_path)
+            original = config_path.read_bytes()
+
+            with self.assertRaisesRegex(ConfigurationError, "non-symlink"):
+                configure_path(
+                    config_path,
+                    state_path,
+                    rules_file=rules_path,
+                )
+            self.assertEqual(config_path.read_bytes(), original)
+            self.assertFalse(state_path.exists())
+
+    def test_duplicate_enabled_navigation_rules_are_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "karabiner.json"
+            state_path = root / "ownership.json"
+            rules_path = root / "codex-gamepad.json"
+            write_config(
+                config_path,
+                {
+                    "profiles": [
+                        {
+                            "name": "Default",
+                            "selected": True,
+                            "complex_modifications": {
+                                "rules": [
+                                    managed_rule(
+                                        NAVIGATION_RULE_DESCRIPTION,
+                                        "duplicate-one",
+                                    ),
+                                    managed_rule(
+                                        NAVIGATION_RULE_DESCRIPTION,
+                                        "duplicate-two",
+                                    ),
+                                ]
+                            },
+                        }
+                    ]
+                },
+            )
+            configure_path(config_path, state_path)
+            write_rules_file(rules_path)
+            original = config_path.read_bytes()
+
+            with self.assertRaisesRegex(ConfigurationError, "ambiguous refresh"):
+                configure_path(
+                    config_path,
+                    state_path,
+                    rules_file=rules_path,
+                )
+            self.assertEqual(config_path.read_bytes(), original)
 
     def test_state_creation_and_subsequent_configuration_are_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -549,7 +923,9 @@ class GamepadProfileConfigurationTests(unittest.TestCase):
             root = Path(directory)
             config_path = root / "test-config.json"
             state_path = root / "test-state.json"
+            rules_path = root / "codex-gamepad.json"
             write_config(config_path, {"profiles": []})
+            write_rules_file(rules_path)
 
             result = subprocess.run(
                 [
@@ -559,6 +935,8 @@ class GamepadProfileConfigurationTests(unittest.TestCase):
                     str(config_path),
                     "--state",
                     str(state_path),
+                    "--rules-file",
+                    str(rules_path),
                 ],
                 check=False,
                 capture_output=True,

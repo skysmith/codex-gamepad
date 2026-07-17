@@ -30,12 +30,19 @@ function main() {
     keyManipulator({ generic_desktop: 'dpad_down' }, { key_code: 'down_arrow' }),
     keyManipulator({ generic_desktop: 'dpad_left' }, { key_code: 'left_arrow' }),
     keyManipulator({ generic_desktop: 'dpad_right' }, { key_code: 'right_arrow' }),
-    keyManipulator({ pointing_button: 'button1' }, { key_code: 'return_or_enter' }),
-    keyManipulator({ pointing_button: 'button2' }, { key_code: 'escape' }),
-    keyManipulator({ pointing_button: 'button4' }, { key_code: 'tab' }),
     keyManipulator(
-      { pointing_button: 'button5' },
+      { pointing_button: 'button1' },
+      { key_code: 'd', modifiers: ['left_control', 'left_shift'] }
+    ),
+    keyManipulator({ pointing_button: 'button2' }, { key_code: 'escape' }),
+    keyManipulator({ pointing_button: 'button5' }, { key_code: 'tab' }),
+    keyManipulator(
+      { pointing_button: 'button3' },
       { key_code: 'k', modifiers: ['left_command'] }
+    ),
+    keyManipulator(
+      { pointing_button: 'button10' },
+      { key_code: 'return_or_enter', repeat: false }
     ),
     keyManipulator(
       { pointing_button: 'button7' },

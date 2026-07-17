@@ -20,14 +20,16 @@ def main() -> None:
     shell_command = (
         f"{shlex.quote(args.speaker)} --background --toggle --require-frontmost"
     )
+    event_keys = ("to", "to_if_alone", "to_if_held_down", "to_after_key_up")
     for rule in profile.get("rules", []):
         for manipulator in rule.get("manipulators", []):
-            for event in manipulator.get("to", []):
-                user_command = event.get("send_user_command")
-                if isinstance(user_command, dict):
-                    user_command["endpoint"] = args.endpoint
-                if "shell_command" in event:
-                    event["shell_command"] = shell_command
+            for event_key in event_keys:
+                for event in manipulator.get(event_key, []):
+                    user_command = event.get("send_user_command")
+                    if isinstance(user_command, dict):
+                        user_command["endpoint"] = args.endpoint
+                    if "shell_command" in event:
+                        event["shell_command"] = shell_command
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")

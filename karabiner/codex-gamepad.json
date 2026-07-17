@@ -43,7 +43,7 @@
         {
           "type": "basic",
           "from": { "pointing_button": "button1", "modifiers": { "optional": ["any"] } },
-          "to": [{ "key_code": "return_or_enter" }],
+          "to": [{ "key_code": "d", "modifiers": ["left_control", "left_shift"] }],
           "conditions": [
             { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
@@ -60,7 +60,7 @@
         },
         {
           "type": "basic",
-          "from": { "pointing_button": "button4", "modifiers": { "optional": ["any"] } },
+          "from": { "pointing_button": "button5", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "tab" }],
           "conditions": [
             { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
@@ -69,8 +69,17 @@
         },
         {
           "type": "basic",
-          "from": { "pointing_button": "button5", "modifiers": { "optional": ["any"] } },
+          "from": { "pointing_button": "button3", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "k", "modifiers": ["left_command"] }],
+          "conditions": [
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
+          ]
+        },
+        {
+          "type": "basic",
+          "from": { "pointing_button": "button10", "modifiers": { "optional": ["any"] } },
+          "to": [{ "key_code": "return_or_enter", "repeat": false }],
           "conditions": [
             { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
@@ -101,16 +110,7 @@
       "manipulators": [
         {
           "type": "basic",
-          "from": { "pointing_button": "button3", "modifiers": { "optional": ["any"] } },
-          "to": [{ "send_user_command": { "endpoint": "/tmp/codex-gamepad-user-command.sock", "payload": { "command": "codex_speak_last_response", "version": 1 } } }],
-          "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
-            { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
-          ]
-        },
-        {
-          "type": "basic",
-          "from": { "pointing_button": "button6", "modifiers": { "optional": ["any"] } },
+          "from": { "pointing_button": "button4", "modifiers": { "optional": ["any"] } },
           "to": [{ "send_user_command": { "endpoint": "/tmp/codex-gamepad-user-command.sock", "payload": { "command": "codex_speak_last_response", "version": 1 } } }],
           "conditions": [
             { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
@@ -124,16 +124,7 @@
       "manipulators": [
         {
           "type": "basic",
-          "from": { "pointing_button": "button3", "modifiers": { "optional": ["any"] } },
-          "to": [{ "shell_command": "\"$HOME/.local/bin/codex-speak-last\" --background --toggle --require-frontmost" }],
-          "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
-            { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
-          ]
-        },
-        {
-          "type": "basic",
-          "from": { "pointing_button": "button6", "modifiers": { "optional": ["any"] } },
+          "from": { "pointing_button": "button4", "modifiers": { "optional": ["any"] } },
           "to": [{ "shell_command": "\"$HOME/.local/bin/codex-speak-last\" --background --toggle --require-frontmost" }],
           "conditions": [
             { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },

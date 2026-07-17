@@ -3,9 +3,12 @@ import Darwin
 import Foundation
 import KarabinerElementsUserCommandReceiver
 
-private let expectedCommand = "codex_speak_last_response"
 private let expectedVersion = 1
 private let codexBundleIdentifier = "com.openai.codex"
+
+private enum ReceiverCommand: String, CaseIterable {
+    case speakLastResponse = "codex_speak_last_response"
+}
 
 @MainActor
 private func triggerSpeaker() {
@@ -37,15 +40,17 @@ private func triggerSpeaker() {
     }
 }
 
-private func isAllowedCommand(_ json: Any) -> Bool {
+private func allowedCommand(_ json: Any) -> ReceiverCommand? {
     guard
         let root = json as? [String: Any],
-        root["command"] as? String == expectedCommand,
+        Set(root.keys) == ["command", "version"],
+        let commandValue = root["command"] as? String,
+        let command = ReceiverCommand(rawValue: commandValue),
         root["version"] as? Int == expectedVersion
     else {
-        return false
+        return nil
     }
-    return true
+    return command
 }
 
 private func terminationSignals() -> AsyncStream<Int32> {
@@ -69,15 +74,41 @@ private func terminationSignals() -> AsyncStream<Int32> {
 struct CodexGamepadReceiver {
     static func main() async {
         if CommandLine.arguments.contains("--self-test") {
-            let accepted = isAllowedCommand([
-                "command": expectedCommand,
+            let accepted = ReceiverCommand.allCases.allSatisfy { command in
+                allowedCommand([
+                    "command": command.rawValue,
+                    "version": expectedVersion,
+                ]) == command
+            }
+            let rejectedWrappedPayload = allowedCommand([
+                "payload": [
+                    "command": ReceiverCommand.speakLastResponse.rawValue,
+                    "version": expectedVersion,
+                ]
+            ]) == nil
+            let rejectedUnknownCommand = allowedCommand([
+                "command": "codex_unknown_command",
                 "version": expectedVersion,
-            ])
-            let rejectedWrappedPayload = !isAllowedCommand([
-                "payload": ["command": expectedCommand, "version": expectedVersion]
-            ])
+            ]) == nil
+            let rejectedExtraField = allowedCommand([
+                "command": ReceiverCommand.speakLastResponse.rawValue,
+                "version": expectedVersion,
+                "extra": true,
+            ]) == nil
+            let rejectedWrongVersion = allowedCommand([
+                "command": ReceiverCommand.speakLastResponse.rawValue,
+                "version": expectedVersion + 1,
+            ]) == nil
             let modeWatcherPassed = controllerModeWatcherSelfTest()
-            Foundation.exit(accepted && rejectedWrappedPayload && modeWatcherPassed ? 0 : 1)
+            Foundation.exit(
+                accepted
+                    && rejectedWrappedPayload
+                    && rejectedUnknownCommand
+                    && rejectedExtraField
+                    && rejectedWrongVersion
+                    && modeWatcherPassed
+                    ? 0 : 1
+            )
         }
 
         let environment = ProcessInfo.processInfo.environment
@@ -87,8 +118,13 @@ struct CodexGamepadReceiver {
         let receiver = KEUserCommandReceiver(
             path: endpointPath,
             onJSON: { json in
-                guard isAllowedCommand(json) else { return }
-                Task { @MainActor in triggerSpeaker() }
+                guard let command = allowedCommand(json) else { return }
+                Task { @MainActor in
+                    switch command {
+                    case .speakLastResponse:
+                        triggerSpeaker()
+                    }
+                }
             },
             onError: { _ in
                 FileHandle.standardError.write(Data("Karabiner command receiver error.\n".utf8))

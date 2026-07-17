@@ -84,7 +84,7 @@ If the user's Codex keyboard shortcuts differ from the documented defaults, eith
 
 ## Calibrate unverified hardware
 
-Do not generalize from face-button labels. Use Karabiner-EventViewer and ask for one physical control at a time. Capture D-pad directions, face buttons, bumpers, extra buttons, and connection mode. Distinguish raw-event verification from the resulting Codex action.
+Do not generalize from face-button labels. Use Karabiner-EventViewer and ask for one physical control at a time. Capture D-pad directions, face buttons, bumpers, triggers, extra buttons, and connection mode. Distinguish raw-event verification from the resulting Codex action.
 
 Only add a device profile after all required events are identified. Keep device identifiers and mappings scoped to that controller, add regression tests, and label the transport tested. If EventViewer cannot see usable events, stop and report that the connection mode is unsupported.
 
@@ -105,7 +105,7 @@ Ask before audible playback because the last response may be private. After cons
 "$HOME/.local/bin/codex-speak-last" --background --toggle --require-frontmost
 ```
 
-With Codex frontmost and an empty composer, guide the user through every row in `docs/HARDWARE_TEST.md`, one control at a time. Test A/Return last so it cannot submit unintended text. Confirm speech starts and a second press stops it. If automatic game handoff is enabled, focus each configured game and Codex in turn, check the selected Karabiner profile, and confirm the game receives raw controller input without generated keystrokes.
+With Codex frontmost and an empty composer, guide the user through every row in `docs/HARDWARE_TEST.md`, one control at a time. For A, use a non-sensitive phrase: hold to dictate and release to insert, then confirm it neither sends nor creates a task. Confirm X starts speech and a second press stops it. Test RT last by using it to send that reviewed disposable transcription exactly once; press duration must not change its Return/send action. If automatic game handoff is enabled, focus each configured game and Codex in turn, check the selected Karabiner profile, and confirm the game receives raw controller input without generated keystrokes.
 
 Never mark an unpressed control or untested game as verified.
 

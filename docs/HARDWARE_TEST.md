@@ -1,6 +1,6 @@
 # Ultimate 2C hardware test
 
-The software path and raw controller calibration are complete. The numbered button events below were observed on the physical controller. Core live checks for D-pad Up and L4-triggered Kokoro playback also passed; the remaining controls and automatic game handoff still need physical verification.
+The software path and raw controller calibration used by the current profile are complete. The numbered button events below were observed on the physical controller. Core live checks for D-pad Up and the Kokoro playback path also passed; the remapped controls and automatic game handoff still need physical verification.
 
 ## Verified test setup
 
@@ -31,6 +31,7 @@ Each numbered button was pressed and observed individually:
 | R4 / second extra | `pointing_button: button6` | Hardware verified |
 | LB | `pointing_button: button7` | Hardware verified |
 | RB | `pointing_button: button8` | Hardware verified |
+| RT | `pointing_button: button10` | Hardware verified |
 | Physical D-pad | `generic_desktop: dpad_up/down/left/right` | Hat-switch translation observed; Up emitted `up_arrow` in Codex |
 
 The physical D-pad is HID usage `0x39` (hat switch), which Karabiner-EventViewer does not expose as a normal raw button event. With **Modify events** enabled for the controller, Karabiner converts it to the four `generic_desktop` D-pad events used by the profile. The left analog stick reports axis motion instead and is not the D-pad.
@@ -42,18 +43,20 @@ The current `is_game_pad` condition remains intentionally portable; the verified
 Verified live with Codex frontmost:
 
 - Physical D-pad Up emitted the virtual `up_arrow` event.
-- L4 invoked the local Kokoro speech path and launched `afplay`.
+- L4 invoked the local Kokoro speech path and launched `afplay` under the earlier calibration mapping.
+- The experimental 180 ms RT tap/hold split did not reliably send during a live trigger squeeze and was removed from the reference profile.
 
 The following checks remain:
 
 - D-pad Down, Left, and Right emit the corresponding arrow keys and move focus/caret as expected.
-- A activates the focused control or submits where Return normally does.
+- Hold A, speak a non-sensitive phrase, and release it. Codex inserts the transcription into the current composer without sending it or creating a task.
 - B dismisses with Escape.
-- X tabs focus.
-- Y opens the command menu.
+- X starts the last completed response with local Kokoro; pressing X again stops it promptly.
+- Y tabs focus.
+- L4 opens the command menu.
 - LB/RB move to the previous/next task.
-- R4 also starts the last completed response with Kokoro.
-- Pressing the active speech button again stops speech promptly.
+- After A inserts a non-sensitive transcription for review, press RT. It emits Return and sends exactly once in the current task regardless of press duration; test this last.
+- R4 remains inert in Codex.
 
 With an unsupported app frontmost, every Codex controller action must do nothing. Supported game experiences are the deliberate exception: they must receive the raw controller instead.
 
@@ -85,6 +88,6 @@ The following live checks remain:
 ## Finalize the profile
 
 1. Complete the remaining functional and automatic handoff checks above; the checked-in button numbers already match the observed hardware events.
-2. Keep only the preferred extra button for speech; release the other for a future action.
+2. Keep R4 reserved until a future action is deliberately chosen and tested.
 3. Run the test and validation commands from the README.
 4. Treat 2.4 GHz/wired support as an experiment: those Windows modes are likely XInput, which Karabiner does not support. Only add a transport after EventViewer recognizes it and the full pass succeeds.

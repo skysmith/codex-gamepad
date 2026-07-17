@@ -238,10 +238,6 @@ if [[ $SKIP_KARABINER -eq 0 ]]; then
   if [[ -f "$KARABINER_CONFIG" && -x "$KARABINER_CLI" ]]; then
     MODE_SWITCHING=1
     echo "Karabiner profiles: $CODEX_PROFILE_NAME / $GAME_PROFILE_NAME"
-    "$UTILITY_PYTHON" "$ROOT/scripts/configure_gamepad_profiles.py" \
-      --check \
-      --config "$KARABINER_CONFIG" \
-      --state "$PROFILE_STATE"
   else
     echo "Automatic game handoff skipped: Karabiner must be opened once and its CLI must be available." >&2
   fi
@@ -283,6 +279,13 @@ if [[ $SKIP_KARABINER -eq 0 ]]; then
   OWNERSHIP_ARTIFACTS+=(
     --regular karabiner_rule "$RULE" "$INSTALL_TEMP/codex-gamepad.json" 644
   )
+  if [[ $MODE_SWITCHING -eq 1 ]]; then
+    "$UTILITY_PYTHON" "$ROOT/scripts/configure_gamepad_profiles.py" \
+      --check \
+      --config "$KARABINER_CONFIG" \
+      --state "$PROFILE_STATE" \
+      --rules-file "$INSTALL_TEMP/codex-gamepad.json"
+  fi
 fi
 
 if [[ $INSTALL_LAUNCH_AGENT -eq 1 ]]; then
@@ -361,7 +364,8 @@ if [[ $DRY_RUN -eq 0 && ( $SKIP_KARABINER -eq 0 || $INSTALL_LAUNCH_AGENT -eq 1 )
   if [[ $SKIP_KARABINER -eq 0 && $MODE_SWITCHING -eq 1 ]]; then
     "$PYTHON" "$ROOT/scripts/configure_gamepad_profiles.py" \
       --config "$KARABINER_CONFIG" \
-      --state "$PROFILE_STATE"
+      --state "$PROFILE_STATE" \
+      --rules-file "$INSTALL_TEMP/codex-gamepad.json"
   fi
 fi
 

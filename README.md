@@ -20,7 +20,7 @@ Open this repository as a local project in Codex or Claude Code, connect the con
 
 The agent can install dependencies, build the receiver, configure owned Karabiner profiles, run diagnostics, and guide the live hardware pass. The user must personally approve macOS permissions, enter any password into the native system prompt, and perform the requested controller presses. The current reference profile is for an 8BitDo Ultimate 2C over Bluetooth LE; other DirectInput controllers require event calibration before the agent should call them supported.
 
-The automated software paths are implemented and tested, and the 8BitDo button numbers have been captured from a physical controller over Bluetooth LE. A live Codex pass also confirmed D-pad Up and L4-triggered Kokoro playback; the other controls and automatic game handoff still need end-to-end checks.
+The automated software paths are implemented and tested, and the 8BitDo button numbers used by the profile have been captured from a physical controller over Bluetooth LE. A live Codex pass also confirmed D-pad Up and the Kokoro playback path; the current remapped controls and automatic game handoff still need end-to-end checks.
 
 The current reference target is macOS 26.5 on Apple silicon, Karabiner-Elements 16.1.0, Swift 6.3.3, Python 3.13.13, and Codex Desktop 26.707.30751 (build 5018). Hardware calibration is for the 8BitDo Ultimate 2C Wireless over Bluetooth LE (`11720:12315`).
 
@@ -32,28 +32,33 @@ The current reference target is macOS 26.5 on Apple silicon, Karabiner-Elements 
 - The Karabiner 16 user-command receiver builds against the official receiver package.
 - The local profile and upstream navigation generator pass Karabiner's own linter/build.
 - An 8BitDo Ultimate 2C Wireless is recognized as a gamepad over Bluetooth LE (`vendor_id` 11720 / `0x2dc8`, `product_id` 12315 / `0x301b`).
-- A, B, X, Y, LB, RB, L4, and R4 have hardware-verified Karabiner button numbers.
+- A, B, X, Y, LB, RB, L4, R4, and RT have hardware-verified Karabiner button numbers.
 - The physical D-pad reports HID hat-switch usage `0x39`; after controller event modification is enabled, Karabiner translates it to `generic_desktop` D-pad events. A live test confirmed that D-pad Up emits `up_arrow` in Codex; the other directions remain untested end to end.
-- A live L4 press invoked the local Kokoro path and launched `afplay`; the stop toggle and R4 speech action remain to be checked.
+- A live L4 press invoked the local Kokoro path and launched `afplay` under the earlier calibration mapping. Speech now lives on X; X start/stop remains to be checked end to end.
 - A live focus pass confirmed automatic `Codex Controller` → `Game Mode` → `Codex Controller` switching for both the dedicated Arcade Chrome process and ares. Living Forest classification passes the receiver self-test; raw controller delivery in each game remains to be checked physically.
 - No response text enters a shell command, log, notification, or persistent audio cache.
 - iPhone/remote-control support is intentionally out of scope.
 
 ## Controller profile
 
+![Labeled Codex controls for the 8BitDo Ultimate 2C](docs/assets/codex-controls-8bitdo-ultimate-2c.png)
+
 | Controller input | Karabiner event | Codex action | Status |
 | --- | --- | --- | --- |
 | Physical D-pad | `dpad_up/down/left/right` | Arrow keys | Up emitted `up_arrow` in Codex; other directions pending |
-| A | `button1` | Return / activate | Event verified |
+| A | `button1` | Hold to dictate; release to insert for review (`Ctrl-Shift-D`) | Event verified; remapped action pending |
 | B | `button2` | Escape | Event verified |
-| X | `button4` | Tab | Event verified |
-| Y | `button5` | Command menu (`Cmd-K`) | Event verified |
+| X | `button4` | Speak last response; press again to stop | Event verified; remapped action pending |
+| Y | `button5` | Next field (`Tab`) | Event verified; remapped action pending |
 | LB | `button7` | Previous task (`Cmd-Shift-[`) | Event verified |
 | RB | `button8` | Next task (`Cmd-Shift-]`) | Event verified |
-| L4 | `button3` | Speak; press again to stop | Kokoro/`afplay` launch verified; stop pending |
-| R4 | `button6` | Speak; press again to stop | Event verified |
+| L4 | `button3` | Command menu (`Cmd-K`) | Event verified; remapped action pending |
+| R4 | `button6` | Reserved / unmapped | Event verified |
+| RT | `button10` | Return / send (press duration does not matter) | Event verified; remapped action pending |
 
-The status above distinguishes raw controller events from resulting Codex actions. Only D-pad Up and the L4 playback launch have been verified end to end so far. Both extra buttons are mapped to speech for the remaining functional checks; reduce that to the preferred button afterward.
+The status above distinguishes raw controller events from resulting Codex actions. Only D-pad Up and the Kokoro launch path (using the earlier L4 mapping) have been verified end to end so far. The current layout keeps the face buttons focused on the speak/write loop: hold A to dictate, release it to review the transcription, then press RT to send. X reads the last answer, Y moves focus, and B cancels.
+
+An experimental RT tap/hold split was rejected after live testing: a natural trigger squeeze can exceed a short timing threshold and be mistaken for a hold, making Send unreliable. The reference layout deliberately gives RT one unconditional action instead.
 
 8BitDo officially lists this model for Windows/Android rather than macOS. Bluetooth may expose a usable Android/DirectInput device, which is consistent with the controller pairing successfully; the 2.4 GHz and wired Windows modes are likely XInput and therefore unsupported by Karabiner unless EventViewer proves otherwise.
 
@@ -147,7 +152,7 @@ Then in Karabiner-Elements:
 
 The receiver uses a Codex Gamepad-specific Unix socket, so it does not occupy Karabiner's shared default receiver endpoint. The legacy shell rule is available if the Swift receiver is intentionally skipped; its extra frontmost-app check uses System Events and may require macOS Automation permission.
 
-Navigation actions assume Codex's documented default keyboard shortcuts. If those shortcuts were customized under **Settings > Keyboard Shortcuts**, update the corresponding `to` events in the profile.
+Navigation actions assume Codex's documented default keyboard shortcuts, including `Ctrl-Shift-D` for A's review-first composer dictation. If those shortcuts were customized under **Settings > Keyboard Shortcuts**, update the corresponding `to` events in the profile.
 
 Use the [hardware checklist](docs/HARDWARE_TEST.md) to complete the remaining functional checks.
 

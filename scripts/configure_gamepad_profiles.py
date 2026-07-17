@@ -32,6 +32,21 @@ MOUSE_DISCARD_KEYS = (
     "mouse_discard_x",
     "mouse_discard_y",
 )
+NAVIGATION_RULE_DESCRIPTION = "Codex Gamepad — navigation (8BitDo Ultimate 2C)"
+RECEIVER_RULE_DESCRIPTION = (
+    "Codex Gamepad — Kokoro speak/stop (Karabiner 16 receiver)"
+)
+SHELL_FALLBACK_RULE_DESCRIPTION = (
+    "Codex Gamepad — Kokoro speak/stop (legacy shell fallback; do not enable with receiver rule)"
+)
+LEGACY_RECEIVER_RULE_DESCRIPTION = (
+    "Codex Gamepad — receiver actions (dictation + Kokoro; Karabiner 16)"
+)
+MANAGED_RULE_DESCRIPTIONS = (
+    NAVIGATION_RULE_DESCRIPTION,
+    RECEIVER_RULE_DESCRIPTION,
+    SHELL_FALLBACK_RULE_DESCRIPTION,
+)
 
 
 class ConfigurationError(ValueError):
@@ -278,6 +293,130 @@ def _profiles(config: Dict[str, Any]) -> List[Any]:
     return profiles
 
 
+def _load_managed_rules(path: Path) -> Dict[str, Dict[str, Any]]:
+    """Load the refreshable rules from a rendered Karabiner asset."""
+
+    contents, _ = _read_regular_file(path, label="Karabiner rules file")
+    asset = _parse_json_object(contents, label="Karabiner rules file")
+    rules = asset.get("rules")
+    if not isinstance(rules, list):
+        raise ConfigurationError("Karabiner rules file rules must be a list.")
+
+    extracted: Dict[str, Dict[str, Any]] = {}
+    for rule in rules:
+        if not isinstance(rule, dict):
+            raise ConfigurationError("Karabiner rules file contains a non-object rule.")
+        description = rule.get("description")
+        if not isinstance(description, str):
+            raise ConfigurationError(
+                "Karabiner rules file contains a rule without a string description."
+            )
+        if description not in MANAGED_RULE_DESCRIPTIONS:
+            continue
+        if description in extracted:
+            raise ConfigurationError(
+                f"Karabiner rules file contains duplicate {description!r} rules."
+            )
+        manipulators = rule.get("manipulators")
+        if (
+            not isinstance(manipulators, list)
+            or not manipulators
+            or any(not isinstance(manipulator, dict) for manipulator in manipulators)
+        ):
+            raise ConfigurationError(
+                f"Karabiner rule {description!r} must contain a non-empty manipulator list."
+            )
+        extracted[description] = copy.deepcopy(rule)
+
+    missing = [
+        description
+        for description in MANAGED_RULE_DESCRIPTIONS
+        if description not in extracted
+    ]
+    if missing:
+        raise ConfigurationError(
+            f"Karabiner rules file is missing required rule {missing[0]!r}."
+        )
+    return extracted
+
+
+def _refresh_enabled_managed_rules(
+    profile: Dict[str, Any],
+    managed_rules: Dict[str, Dict[str, Any]],
+) -> None:
+    """Refresh already-enabled managed rules without enabling absent rules."""
+
+    complex_modifications = profile.get("complex_modifications")
+    if complex_modifications is None:
+        return
+    if not isinstance(complex_modifications, dict):
+        raise ConfigurationError(
+            f"Profile {profile.get('name')!r} has invalid complex modifications."
+        )
+    rules = complex_modifications.get("rules")
+    if rules is None:
+        return
+    if not isinstance(rules, list):
+        raise ConfigurationError(
+            f"Profile {profile.get('name')!r} has a non-list complex-modification rules value."
+        )
+    if any(not isinstance(rule, dict) for rule in rules):
+        raise ConfigurationError(
+            f"Profile {profile.get('name')!r} has a non-object complex-modification rule."
+        )
+
+    navigation_indices = [
+        index
+        for index, rule in enumerate(rules)
+        if rule.get("description") == NAVIGATION_RULE_DESCRIPTION
+    ]
+    if len(navigation_indices) > 1:
+        raise ConfigurationError(
+            "Codex Controller contains duplicate enabled navigation rules; refusing an ambiguous refresh."
+        )
+    if navigation_indices:
+        rules[navigation_indices[0]] = copy.deepcopy(
+            managed_rules[NAVIGATION_RULE_DESCRIPTION]
+        )
+
+    receiver_descriptions = {
+        LEGACY_RECEIVER_RULE_DESCRIPTION,
+        RECEIVER_RULE_DESCRIPTION,
+    }
+    receiver_indices = [
+        index
+        for index, rule in enumerate(rules)
+        if isinstance(rule.get("description"), str)
+        and rule.get("description") in receiver_descriptions
+    ]
+    if receiver_indices:
+        first_receiver_index = receiver_indices[0]
+        refreshed_rules: List[Any] = []
+        for index, rule in enumerate(rules):
+            if index == first_receiver_index:
+                refreshed_rules.append(
+                    copy.deepcopy(managed_rules[RECEIVER_RULE_DESCRIPTION])
+                )
+            elif index not in receiver_indices:
+                refreshed_rules.append(rule)
+        complex_modifications["rules"] = refreshed_rules
+
+    rules = complex_modifications["rules"]
+    fallback_indices = [
+        index
+        for index, rule in enumerate(rules)
+        if rule.get("description") == SHELL_FALLBACK_RULE_DESCRIPTION
+    ]
+    if len(fallback_indices) > 1:
+        raise ConfigurationError(
+            "Codex Controller contains duplicate enabled shell fallback rules; refusing an ambiguous refresh."
+        )
+    if fallback_indices:
+        rules[fallback_indices[0]] = copy.deepcopy(
+            managed_rules[SHELL_FALLBACK_RULE_DESCRIPTION]
+        )
+
+
 def _owned_profile_index(profiles: List[Any], name: str) -> Optional[int]:
     matches = [
         index
@@ -360,7 +499,10 @@ def _configure_device(profile: Dict[str, Any], *, ignored: bool) -> None:
             device[key] = True
 
 
-def configure_profiles(config: Dict[str, Any]) -> Dict[str, Any]:
+def configure_profiles(
+    config: Dict[str, Any],
+    managed_rules: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
     """Return a configured deep copy; ownership must be checked by ``configure_path``."""
 
     if not isinstance(config, dict):
@@ -380,6 +522,8 @@ def configure_profiles(config: Dict[str, Any]) -> Dict[str, Any]:
 
     codex_profile["name"] = CODEX_PROFILE_NAME
     _configure_device(codex_profile, ignored=False)
+    if managed_rules is not None:
+        _refresh_enabled_managed_rules(codex_profile, managed_rules)
 
     game_profile = copy.deepcopy(codex_profile)
     game_profile["name"] = GAME_PROFILE_NAME
@@ -447,6 +591,7 @@ def _prepare_configuration(
     state_path: Path,
     *,
     adopt_existing: bool,
+    managed_rules: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Tuple[Dict[str, Any], bytes, os.stat_result, Optional[Dict[str, Any]]]:
     """Validate ownership and return the prospective configuration and state."""
 
@@ -479,7 +624,12 @@ def _prepare_configuration(
         restore = _restore_profile_name(profiles, adopting=adopt_existing)
         state_to_create = _state_value(restore)
 
-    return configure_profiles(config), original, config_metadata, state_to_create
+    return (
+        configure_profiles(config, managed_rules=managed_rules),
+        original,
+        config_metadata,
+        state_to_create,
+    )
 
 
 def check_configure_path(
@@ -487,15 +637,22 @@ def check_configure_path(
     state_path: Path,
     *,
     adopt_existing: bool = False,
+    rules_file: Optional[Path] = None,
 ) -> bool:
     """Validate a profile update without changing the config, state, or directories."""
 
     path = path.expanduser()
     state_path = state_path.expanduser()
+    managed_rules = (
+        _load_managed_rules(rules_file.expanduser())
+        if rules_file is not None
+        else None
+    )
     configured, original, _, _ = _prepare_configuration(
         path,
         state_path,
         adopt_existing=adopt_existing,
+        managed_rules=managed_rules,
     )
     return _serialized(configured) != original
 
@@ -505,16 +662,23 @@ def configure_path(
     state_path: Path,
     *,
     adopt_existing: bool = False,
+    rules_file: Optional[Path] = None,
 ) -> bool:
     """Configure profiles under validated external ownership state."""
 
     path = path.expanduser()
     state_path = state_path.expanduser()
+    managed_rules = (
+        _load_managed_rules(rules_file.expanduser())
+        if rules_file is not None
+        else None
+    )
     created_state: Optional[Tuple[bytes, os.stat_result]] = None
     configured, original, config_metadata, state_to_create = _prepare_configuration(
         path,
         state_path,
         adopt_existing=adopt_existing,
+        managed_rules=managed_rules,
     )
     if state_to_create is not None:
         created_state = _create_private_state(state_path, state_to_create)
@@ -725,6 +889,11 @@ def parse_args() -> argparse.Namespace:
         default=default_state_path(),
         help="Private ownership state used to make profile removal reversible",
     )
+    parser.add_argument(
+        "--rules-file",
+        type=Path,
+        help="Rendered Codex Gamepad asset used to refresh already-enabled managed rules",
+    )
     action = parser.add_mutually_exclusive_group()
     action.add_argument(
         "--adopt-existing",
@@ -767,6 +936,18 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
+        if args.rules_file is not None and any(
+            (
+                args.remove,
+                args.prepare_remove,
+                args.finalize_remove,
+                args.check_remove,
+                args.check_finalize_remove,
+            )
+        ):
+            raise ConfigurationError(
+                "--rules-file is only valid when configuring profiles or using --check."
+            )
         if args.remove:
             changed = remove_path(args.config, args.state)
             action = "Removed" if changed else "Ownership removed"
@@ -783,13 +964,18 @@ def main() -> int:
             changed = check_finalize_remove_path(args.config, args.state)
             action = "Would finalize removal" if changed else "Removal already finalized"
         elif args.check:
-            changed = check_configure_path(args.config, args.state)
+            changed = check_configure_path(
+                args.config,
+                args.state,
+                rules_file=args.rules_file,
+            )
             action = "Would configure" if changed else "Already configured"
         else:
             changed = configure_path(
                 args.config,
                 args.state,
                 adopt_existing=args.adopt_existing,
+                rules_file=args.rules_file,
             )
             action = "Configured" if changed else "Already configured"
     except (ConfigurationError, OSError) as error:
