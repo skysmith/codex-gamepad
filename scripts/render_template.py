@@ -14,7 +14,7 @@ def main() -> None:
     parser.add_argument("output", type=Path)
     parser.add_argument("--mode", choices=("raw", "shell", "xml"), default="raw")
     parser.add_argument("replacements", nargs="*")
-    args = parser.parse_args()
+    args = parser.parse_intermixed_args()
 
     values: dict[str, str] = {}
     for replacement in args.replacements:
