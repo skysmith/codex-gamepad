@@ -1,0 +1,4 @@
+interface:
+  display_name: "Install Codex Gamepad"
+  short_description: "Safely install and configure Codex Gamepad"
+  default_prompt: "Use $install-codex-gamepad to inspect this Mac and finish installing and testing Codex Gamepad."

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.codex-gamepad.receiver</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__RECEIVER_PATH__</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>CODEX_GAMEPAD_ENDPOINT</key>
+    <string>__ENDPOINT_PATH__</string>
+    <key>CODEX_GAMEPAD_MODE_SWITCHING</key>
+    <string>__MODE_SWITCHING__</string>
+    <key>CODEX_GAMEPAD_KARABINER_CLI</key>
+    <string>__KARABINER_CLI__</string>
+    <key>CODEX_GAMEPAD_CODEX_PROFILE</key>
+    <string>__CODEX_PROFILE__</string>
+    <key>CODEX_GAMEPAD_GAME_PROFILE</key>
+    <string>__GAME_PROFILE__</string>
+    <key>CODEX_GAMEPAD_ARCADE_CHROME_MARKER</key>
+    <string>__ARCADE_CHROME_MARKER__</string>
+    <key>CODEX_GAMEPAD_LIVING_FOREST_MARKER</key>
+    <string>__LIVING_FOREST_MARKER__</string>
+    <key>CODEX_GAMEPAD_SPEAKER</key>
+    <string>__SPEAKER_PATH__</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+  <key>StandardOutPath</key>
+  <string>__LOG_PATH__</string>
+  <key>StandardErrorPath</key>
+  <string>__LOG_PATH__</string>
+</dict>
+</plist>
