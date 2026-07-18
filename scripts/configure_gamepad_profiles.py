@@ -34,13 +34,19 @@ MOUSE_DISCARD_KEYS = (
 )
 NAVIGATION_RULE_DESCRIPTION = "Codex Gamepad — navigation (8BitDo Ultimate 2C)"
 RECEIVER_RULE_DESCRIPTION = (
-    "Codex Gamepad — Kokoro speak/stop (Karabiner 16 receiver)"
+    "Codex Gamepad — speak/stop (Karabiner 16 receiver)"
 )
 SHELL_FALLBACK_RULE_DESCRIPTION = (
-    "Codex Gamepad — Kokoro speak/stop (legacy shell fallback; do not enable with receiver rule)"
+    "Codex Gamepad — speak/stop (legacy shell fallback; do not enable with receiver rule)"
 )
 LEGACY_RECEIVER_RULE_DESCRIPTION = (
     "Codex Gamepad — receiver actions (dictation + Kokoro; Karabiner 16)"
+)
+LEGACY_KOKORO_RECEIVER_RULE_DESCRIPTION = (
+    "Codex Gamepad — Kokoro speak/stop (Karabiner 16 receiver)"
+)
+LEGACY_KOKORO_SHELL_FALLBACK_RULE_DESCRIPTION = (
+    "Codex Gamepad — Kokoro speak/stop (legacy shell fallback; do not enable with receiver rule)"
 )
 MANAGED_RULE_DESCRIPTIONS = (
     NAVIGATION_RULE_DESCRIPTION,
@@ -381,6 +387,7 @@ def _refresh_enabled_managed_rules(
 
     receiver_descriptions = {
         LEGACY_RECEIVER_RULE_DESCRIPTION,
+        LEGACY_KOKORO_RECEIVER_RULE_DESCRIPTION,
         RECEIVER_RULE_DESCRIPTION,
     }
     receiver_indices = [
@@ -402,10 +409,14 @@ def _refresh_enabled_managed_rules(
         complex_modifications["rules"] = refreshed_rules
 
     rules = complex_modifications["rules"]
+    fallback_descriptions = {
+        LEGACY_KOKORO_SHELL_FALLBACK_RULE_DESCRIPTION,
+        SHELL_FALLBACK_RULE_DESCRIPTION,
+    }
     fallback_indices = [
         index
         for index, rule in enumerate(rules)
-        if rule.get("description") == SHELL_FALLBACK_RULE_DESCRIPTION
+        if rule.get("description") in fallback_descriptions
     ]
     if len(fallback_indices) > 1:
         raise ConfigurationError(
@@ -415,6 +426,37 @@ def _refresh_enabled_managed_rules(
         rules[fallback_indices[0]] = copy.deepcopy(
             managed_rules[SHELL_FALLBACK_RULE_DESCRIPTION]
         )
+
+
+def _enable_managed_rules(
+    profile: Dict[str, Any],
+    managed_rules: Dict[str, Dict[str, Any]],
+) -> None:
+    """Enable the supported rule pair and remove obsolete Codex Gamepad variants."""
+    complex_modifications = profile.setdefault("complex_modifications", {})
+    if not isinstance(complex_modifications, dict):
+        raise ConfigurationError(
+            f"Profile {profile.get('name')!r} has invalid complex modifications."
+        )
+    rules = complex_modifications.setdefault("rules", [])
+    if not isinstance(rules, list) or any(not isinstance(rule, dict) for rule in rules):
+        raise ConfigurationError(
+            f"Profile {profile.get('name')!r} has invalid complex-modification rules."
+        )
+    obsolete_descriptions = {
+        *MANAGED_RULE_DESCRIPTIONS,
+        LEGACY_RECEIVER_RULE_DESCRIPTION,
+        LEGACY_KOKORO_RECEIVER_RULE_DESCRIPTION,
+        LEGACY_KOKORO_SHELL_FALLBACK_RULE_DESCRIPTION,
+    }
+    unrelated = [
+        rule for rule in rules if rule.get("description") not in obsolete_descriptions
+    ]
+    complex_modifications["rules"] = [
+        *unrelated,
+        copy.deepcopy(managed_rules[NAVIGATION_RULE_DESCRIPTION]),
+        copy.deepcopy(managed_rules[RECEIVER_RULE_DESCRIPTION]),
+    ]
 
 
 def _owned_profile_index(profiles: List[Any], name: str) -> Optional[int]:
@@ -502,6 +544,8 @@ def _configure_device(profile: Dict[str, Any], *, ignored: bool) -> None:
 def configure_profiles(
     config: Dict[str, Any],
     managed_rules: Optional[Dict[str, Dict[str, Any]]] = None,
+    *,
+    enable_managed_rules: bool = False,
 ) -> Dict[str, Any]:
     """Return a configured deep copy; ownership must be checked by ``configure_path``."""
 
@@ -523,7 +567,10 @@ def configure_profiles(
     codex_profile["name"] = CODEX_PROFILE_NAME
     _configure_device(codex_profile, ignored=False)
     if managed_rules is not None:
-        _refresh_enabled_managed_rules(codex_profile, managed_rules)
+        if enable_managed_rules:
+            _enable_managed_rules(codex_profile, managed_rules)
+        else:
+            _refresh_enabled_managed_rules(codex_profile, managed_rules)
 
     game_profile = copy.deepcopy(codex_profile)
     game_profile["name"] = GAME_PROFILE_NAME
@@ -592,6 +639,7 @@ def _prepare_configuration(
     *,
     adopt_existing: bool,
     managed_rules: Optional[Dict[str, Dict[str, Any]]] = None,
+    enable_managed_rules: bool = False,
 ) -> Tuple[Dict[str, Any], bytes, os.stat_result, Optional[Dict[str, Any]]]:
     """Validate ownership and return the prospective configuration and state."""
 
@@ -625,7 +673,11 @@ def _prepare_configuration(
         state_to_create = _state_value(restore)
 
     return (
-        configure_profiles(config, managed_rules=managed_rules),
+        configure_profiles(
+            config,
+            managed_rules=managed_rules,
+            enable_managed_rules=enable_managed_rules,
+        ),
         original,
         config_metadata,
         state_to_create,
@@ -638,6 +690,7 @@ def check_configure_path(
     *,
     adopt_existing: bool = False,
     rules_file: Optional[Path] = None,
+    enable_managed_rules: bool = False,
 ) -> bool:
     """Validate a profile update without changing the config, state, or directories."""
 
@@ -653,6 +706,7 @@ def check_configure_path(
         state_path,
         adopt_existing=adopt_existing,
         managed_rules=managed_rules,
+        enable_managed_rules=enable_managed_rules,
     )
     return _serialized(configured) != original
 
@@ -663,6 +717,7 @@ def configure_path(
     *,
     adopt_existing: bool = False,
     rules_file: Optional[Path] = None,
+    enable_managed_rules: bool = False,
 ) -> bool:
     """Configure profiles under validated external ownership state."""
 
@@ -679,6 +734,7 @@ def configure_path(
         state_path,
         adopt_existing=adopt_existing,
         managed_rules=managed_rules,
+        enable_managed_rules=enable_managed_rules,
     )
     if state_to_create is not None:
         created_state = _create_private_state(state_path, state_to_create)
@@ -894,6 +950,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Rendered Codex Gamepad asset used to refresh already-enabled managed rules",
     )
+    parser.add_argument(
+        "--enable-managed-rules",
+        action="store_true",
+        help="Enable navigation and receiver rules while removing obsolete variants",
+    )
     action = parser.add_mutually_exclusive_group()
     action.add_argument(
         "--adopt-existing",
@@ -948,6 +1009,8 @@ def main() -> int:
             raise ConfigurationError(
                 "--rules-file is only valid when configuring profiles or using --check."
             )
+        if args.enable_managed_rules and args.rules_file is None:
+            raise ConfigurationError("--enable-managed-rules requires --rules-file.")
         if args.remove:
             changed = remove_path(args.config, args.state)
             action = "Removed" if changed else "Ownership removed"
@@ -968,6 +1031,7 @@ def main() -> int:
                 args.config,
                 args.state,
                 rules_file=args.rules_file,
+                enable_managed_rules=args.enable_managed_rules,
             )
             action = "Would configure" if changed else "Already configured"
         else:
@@ -976,6 +1040,7 @@ def main() -> int:
                 args.state,
                 adopt_existing=args.adopt_existing,
                 rules_file=args.rules_file,
+                enable_managed_rules=args.enable_managed_rules,
             )
             action = "Configured" if changed else "Already configured"
     except (ConfigurationError, OSError) as error:

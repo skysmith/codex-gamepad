@@ -14,10 +14,33 @@ class ConfigTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.json"
             path.write_text(
-                json.dumps({"voice": "af_heart", "speed": 1.05, "thread": "thread-1"}),
+                json.dumps({
+                    "speech_backend": "apple",
+                    "system_voice": "Samantha",
+                    "system_rate": 210,
+                    "bindings": {"button_a": "return_or_send"},
+                    "custom_shortcuts": {"button_r4": "cmd+shift+p"},
+                    "thread": "thread-1",
+                }),
                 encoding="utf-8",
             )
             self.assertEqual(load_config(path)["thread"], "thread-1")
+
+    def test_rejects_invalid_backend_or_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.json"
+            path.write_text('{"speech_backend":"remote"}', encoding="utf-8")
+            with self.assertRaises(CodexGamepadError):
+                load_config(path)
+            path.write_text('{"bindings":{"button_a":42}}', encoding="utf-8")
+            with self.assertRaises(CodexGamepadError):
+                load_config(path)
+            path.write_text('{"system_rate":true}', encoding="utf-8")
+            with self.assertRaises(CodexGamepadError):
+                load_config(path)
+            path.write_text('{"custom_shortcuts":{"button_r4":42}}', encoding="utf-8")
+            with self.assertRaises(CodexGamepadError):
+                load_config(path)
 
     def test_rejects_unknown_keys(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

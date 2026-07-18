@@ -14,11 +14,18 @@ ALLOWED_TYPES: dict[str, type[Any] | tuple[type[Any], ...]] = {
     "codex_binary": str,
     "model": str,
     "voices": str,
+    "speech_backend": str,
+    "system_voice": str,
+    "system_rate": int,
     "voice": str,
     "speed": (int, float),
     "max_characters": int,
     "compat_rollout_fallback": bool,
+    "bindings": dict,
+    "custom_shortcuts": dict,
 }
+
+SPEECH_BACKENDS = {"apple", "kokoro"}
 
 
 def default_config_path() -> Path:
@@ -48,7 +55,21 @@ def load_config(path: str | os.PathLike[str] | None = None) -> dict[str, Any]:
     for key, item in value.items():
         expected = ALLOWED_TYPES[key]
         if not isinstance(item, expected) or (
-            key in {"speed", "max_characters"} and isinstance(item, bool)
+            key in {"speed", "system_rate", "max_characters"} and isinstance(item, bool)
         ):
             raise CodexGamepadError(f"Invalid value for Codex Gamepad config key: {key}")
+    if value.get("speech_backend", "apple") not in SPEECH_BACKENDS:
+        raise CodexGamepadError("Speech backend must be apple or kokoro.")
+    if "system_rate" in value and not 80 <= value["system_rate"] <= 500:
+        raise CodexGamepadError("Apple speech rate must be between 80 and 500.")
+    for key, label in (
+        ("bindings", "Controller bindings"),
+        ("custom_shortcuts", "Custom shortcuts"),
+    ):
+        mapping = value.get(key, {})
+        if any(
+            not isinstance(name, str) or not isinstance(item, str)
+            for name, item in mapping.items()
+        ):
+            raise CodexGamepadError(f"{label} must map names to strings.")
     return value

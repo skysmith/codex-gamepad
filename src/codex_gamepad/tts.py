@@ -13,6 +13,7 @@ from .models import CodexGamepadError
 
 DEFAULT_MODEL_NAME = "kokoro-v1.0.onnx"
 DEFAULT_VOICES_NAME = "voices-v1.0.bin"
+DEFAULT_SAY_PATH = "/usr/bin/say"
 _ACTIVE_PLAYER: subprocess.Popen[bytes] | None = None
 
 
@@ -61,6 +62,24 @@ def check_kokoro_readiness(
     ):
         raise CodexGamepadError("The installed Kokoro Python packages are incompatible.")
     return assets
+
+
+def check_system_speech_readiness(say_path: str = DEFAULT_SAY_PATH) -> None:
+    """Validate Apple's built-in speech command without synthesizing text."""
+    if not Path(say_path).is_file():
+        raise CodexGamepadError("The macOS speech command was not found.")
+    try:
+        result = subprocess.run(
+            [say_path, "-v", "?"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+    except OSError as error:
+        raise CodexGamepadError("The macOS speech command could not be started.") from error
+    if result.returncode != 0:
+        raise CodexGamepadError("The macOS speech command is not ready.")
 
 
 class KokoroBackend:
@@ -142,6 +161,43 @@ def _play(path: Path, player_path: str = "/usr/bin/afplay") -> None:
         _ACTIVE_PLAYER = None
     if return_code not in (0, -15):
         raise CodexGamepadError("The response audio player exited unexpectedly.")
+
+
+def speak_system(
+    chunks: Iterable[str],
+    *,
+    voice: str | None = None,
+    rate: int = 200,
+    say_path: str = DEFAULT_SAY_PATH,
+) -> None:
+    """Speak with Apple voices while keeping response text out of argv and logs."""
+    global _ACTIVE_PLAYER
+    chunk_list = list(chunks)
+    if not chunk_list:
+        raise CodexGamepadError("The Codex response contains no speakable text.")
+    if not Path(say_path).is_file():
+        raise CodexGamepadError("The macOS speech command was not found.")
+    command = [say_path]
+    if voice:
+        command.extend(["-v", voice])
+    command.extend(["-r", str(rate)])
+    try:
+        for chunk in chunk_list:
+            _ACTIVE_PLAYER = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            _ACTIVE_PLAYER.communicate(chunk.encode("utf-8"))
+            return_code = _ACTIVE_PLAYER.returncode
+            _ACTIVE_PLAYER = None
+            if return_code not in (0, -15):
+                raise CodexGamepadError("The macOS speech command exited unexpectedly.")
+    except OSError as error:
+        raise CodexGamepadError("The Codex response could not be spoken.") from error
+    finally:
+        _ACTIVE_PLAYER = None
 
 
 def speak_streaming(

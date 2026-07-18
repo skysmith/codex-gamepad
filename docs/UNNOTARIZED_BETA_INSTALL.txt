@@ -1,0 +1,49 @@
+CODEX GAMEPAD - APPLE SILICON UNNOTARIZED BETA
+================================================
+
+This is a test build for macOS 15 or newer on Apple Silicon Macs.
+
+IMPORTANT
+---------
+This app is not Developer ID signed or notarized by Apple. Apple has not
+scanned this build and macOS cannot verify its developer. Only continue if
+you received it from a source you trust and its SHA-256 checksum matches the
+checksum published by that source.
+
+Do not disable Gatekeeper and do not run a command that removes quarantine
+from the app. Use macOS's per-app "Open Anyway" flow below.
+
+BEFORE INSTALLING
+-----------------
+1. Install Karabiner-Elements 16 or newer from:
+   https://karabiner-elements.pqrs.org/
+2. Open Karabiner-Elements once.
+3. Approve the macOS system-extension and input permissions it requests.
+
+INSTALL
+-------
+1. Open the DMG.
+2. Drag "Codex Gamepad Setup" to the Applications shortcut.
+3. In Applications, double-click "Codex Gamepad Setup" once.
+4. macOS will probably block it because it is unnotarized. Click Done.
+5. Open System Settings > Privacy & Security.
+6. Scroll to Security and click Open Anyway for Codex Gamepad Setup.
+   Apple makes this button available for about one hour after step 3.
+7. Authenticate with your Mac login if requested, then click Open.
+8. In Codex Gamepad Setup, select Install and follow the status shown there.
+
+After this one-time exception, macOS should allow the same app to open
+normally. Native macOS and Karabiner permission prompts still require your
+approval.
+
+WHAT IS INCLUDED
+----------------
+- Codex Gamepad Setup and control panel
+- Apple Silicon receiver and isolated runtime bootstrap
+- Configurable controller bindings
+- Apple system voices
+
+Kokoro is not bundled. It remains an optional download from inside Setup.
+
+This project is unofficial and is not affiliated with OpenAI, Apple,
+Karabiner-Elements, 8BitDo, or Kokoro.

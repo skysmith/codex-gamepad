@@ -9,7 +9,7 @@
           "from": { "generic_desktop": "dpad_up", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "up_arrow" }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         },
@@ -18,7 +18,7 @@
           "from": { "generic_desktop": "dpad_down", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "down_arrow" }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         },
@@ -27,7 +27,7 @@
           "from": { "generic_desktop": "dpad_left", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "left_arrow" }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         },
@@ -36,7 +36,7 @@
           "from": { "generic_desktop": "dpad_right", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "right_arrow" }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         },
@@ -45,7 +45,7 @@
           "from": { "pointing_button": "button1", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "d", "modifiers": ["left_control", "left_shift"] }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         },
@@ -54,7 +54,7 @@
           "from": { "pointing_button": "button2", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "escape" }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         },
@@ -63,7 +63,7 @@
           "from": { "pointing_button": "button5", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "tab" }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         },
@@ -72,7 +72,7 @@
           "from": { "pointing_button": "button3", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "k", "modifiers": ["left_command"] }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         },
@@ -81,7 +81,7 @@
           "from": { "pointing_button": "button10", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "return_or_enter", "repeat": false }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         },
@@ -90,7 +90,7 @@
           "from": { "pointing_button": "button7", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "open_bracket", "modifiers": ["left_command", "left_shift"] }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         },
@@ -99,35 +99,35 @@
           "from": { "pointing_button": "button8", "modifiers": { "optional": ["any"] } },
           "to": [{ "key_code": "close_bracket", "modifiers": ["left_command", "left_shift"] }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         }
       ]
     },
     {
-      "description": "Codex Gamepad — Kokoro speak/stop (Karabiner 16 receiver)",
+      "description": "Codex Gamepad — speak/stop (Karabiner 16 receiver)",
       "manipulators": [
         {
           "type": "basic",
           "from": { "pointing_button": "button4", "modifiers": { "optional": ["any"] } },
           "to": [{ "send_user_command": { "endpoint": "/tmp/codex-gamepad-user-command.sock", "payload": { "command": "codex_speak_last_response", "version": 1 } } }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         }
       ]
     },
     {
-      "description": "Codex Gamepad — Kokoro speak/stop (legacy shell fallback; do not enable with receiver rule)",
+      "description": "Codex Gamepad — speak/stop (legacy shell fallback; do not enable with receiver rule)",
       "manipulators": [
         {
           "type": "basic",
           "from": { "pointing_button": "button4", "modifiers": { "optional": ["any"] } },
           "to": [{ "shell_command": "\"$HOME/.local/bin/codex-speak-last\" --background --toggle --require-frontmost" }],
           "conditions": [
-            { "type": "device_if", "identifiers": [{ "is_game_pad": true }] },
+            { "type": "device_if", "identifiers": [{ "is_game_pad": true, "vendor_id": 11720, "product_id": 12315 }] },
             { "type": "frontmost_application_if", "bundle_identifiers": ["^com\\.openai\\.codex$"] }
           ]
         }

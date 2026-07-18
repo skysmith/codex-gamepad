@@ -1,6 +1,6 @@
 # Ultimate 2C hardware test
 
-The software path and raw controller calibration used by the current profile are complete. The numbered button events below were observed on the physical controller. Core live checks for D-pad Up and the Kokoro playback path also passed; the remapped controls and automatic game handoff still need physical verification.
+The software path and raw controller calibration used by the current profile are complete. The numbered button events below were observed on the physical controller. Core live checks for D-pad Up and an earlier Kokoro playback binding also passed; the current editable bindings still need a complete physical pass.
 
 ## Verified test setup
 
@@ -12,7 +12,7 @@ The software path and raw controller calibration used by the current profile are
 - Karabiner-Elements: 16.1.0, installed and configured
 - Controller **Modify events**: enabled in the **Codex Controller** profile; **Game Mode** releases the controller from Karabiner
 - Gamepad mouse flags: X, Y, vertical wheel, and horizontal wheel are all discarded so stick motion remains inert outside Codex
-- Local installer, receiver, Kokoro assets, and permissions: configured
+- Local installer, receiver, Apple speech, optional Kokoro assets, and permissions: configured
 - `./scripts/preflight.sh`: passing with the controller connected
 
 8BitDo does not officially list this model for macOS, but its Bluetooth gamepad interface is recognized on the tested Mac.
@@ -36,14 +36,14 @@ Each numbered button was pressed and observed individually:
 
 The physical D-pad is HID usage `0x39` (hat switch), which Karabiner-EventViewer does not expose as a normal raw button event. With **Modify events** enabled for the controller, Karabiner converts it to the four `generic_desktop` D-pad events used by the profile. The left analog stick reports axis motion instead and is not the D-pad.
 
-The current `is_game_pad` condition remains intentionally portable; the verified device identifiers are documented here rather than required by the profile.
+The profile requires both `is_game_pad` and the verified vendor/product identifiers, preventing another connected gamepad from triggering Codex actions. Other controllers need their own calibrated profile.
 
 ## Functional verification
 
 Verified live with Codex frontmost:
 
 - Physical D-pad Up emitted the virtual `up_arrow` event.
-- L4 invoked the local Kokoro speech path and launched `afplay` under the earlier calibration mapping.
+- L4 invoked the optional Kokoro speech path and launched `afplay` under an earlier calibration mapping.
 - The experimental 180 ms RT tap/hold split did not reliably send during a live trigger squeeze and was removed from the reference profile.
 
 The following checks remain:
@@ -51,7 +51,7 @@ The following checks remain:
 - D-pad Down, Left, and Right emit the corresponding arrow keys and move focus/caret as expected.
 - Hold A, speak a non-sensitive phrase, and release it. Codex inserts the transcription into the current composer without sending it or creating a task.
 - B dismisses with Escape.
-- X starts the last completed response with local Kokoro; pressing X again stops it promptly.
+- X starts the last completed response with the selected local voice; pressing X again stops it promptly.
 - Y tabs focus.
 - L4 opens the command menu.
 - LB/RB move to the previous/next task.

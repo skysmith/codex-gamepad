@@ -1,5 +1,13 @@
 {
-  "voice": "af_heart",
-  "speed": 1.05,
-  "max_characters": 12000
+  "speech_backend": "apple",
+  "system_voice": "Samantha",
+  "system_rate": 200,
+  "max_characters": 12000,
+  "bindings": {
+    "button_x": "speak",
+    "button_r4": "custom"
+  },
+  "custom_shortcuts": {
+    "button_r4": "cmd+shift+p"
+  }
 }

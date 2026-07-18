@@ -5,7 +5,9 @@ function conditions() {
   return [
     {
       type: 'device_if',
-      identifiers: [{ is_game_pad: true }],
+      identifiers: [
+        { is_game_pad: true, vendor_id: 11720, product_id: 12315 },
+      ],
     },
     {
       type: 'frontmost_application_if',

@@ -78,15 +78,23 @@ class CreateVenvMarkerSafetyTests(unittest.TestCase):
         launcher.chmod(0o755)
         return launcher
 
-    def _run(self, environment: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    def _run(
+        self,
+        environment: dict[str, str],
+        *,
+        with_kokoro: bool = False,
+    ) -> subprocess.CompletedProcess[str]:
+        arguments = [
+            "bash",
+            str(ROOT / "scripts" / "install-local.sh"),
+            "--create-venv",
+            "--skip-receiver",
+            "--skip-karabiner",
+        ]
+        if with_kokoro:
+            arguments.append("--with-kokoro")
         return subprocess.run(
-            [
-                "bash",
-                str(ROOT / "scripts" / "install-local.sh"),
-                "--create-venv",
-                "--skip-receiver",
-                "--skip-karabiner",
-            ],
+            arguments,
             check=False,
             capture_output=True,
             text=True,
@@ -109,7 +117,7 @@ class CreateVenvMarkerSafetyTests(unittest.TestCase):
             self.assertIn("Refusing unowned external artifact", result.stderr)
             self.assertEqual(launcher.read_bytes(), original_launcher)
             self.assertFalse(prefix.exists())
-            self.assertEqual(len(uv_log.read_text(encoding="utf-8").splitlines()), 2)
+            self.assertEqual(len(uv_log.read_text(encoding="utf-8").splitlines()), 1)
 
             launcher.unlink()
             retry = self._run(environment)
@@ -121,7 +129,7 @@ class CreateVenvMarkerSafetyTests(unittest.TestCase):
                 "codex-gamepad-v1\n",
             )
             self.assertTrue((prefix / ".codex-gamepad-ownership.json").is_file())
-            self.assertEqual(len(uv_log.read_text(encoding="utf-8").splitlines()), 4)
+            self.assertEqual(len(uv_log.read_text(encoding="utf-8").splitlines()), 2)
 
     def test_preexisting_marker_still_supports_create_venv_and_idempotent_upgrade(
         self,
@@ -145,11 +153,25 @@ class CreateVenvMarkerSafetyTests(unittest.TestCase):
                 marker.read_text(encoding="utf-8"), "codex-gamepad-v1\n"
             )
             self.assertEqual(uv_log.read_text(encoding="utf-8"), first_uv_calls)
-            self.assertEqual(len(first_uv_calls.splitlines()), 2)
+            self.assertEqual(len(first_uv_calls.splitlines()), 1)
             manifest = json.loads(
                 (prefix / ".codex-gamepad-ownership.json").read_text(encoding="utf-8")
             )
             self.assertEqual(set(manifest["artifacts"]), {"launcher", "uninstaller"})
+
+    def test_optional_kokoro_adds_a_pinned_dependency_install(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory).resolve()
+            prefix = home / ".local" / "share" / "codex-gamepad"
+            environment, uv_log = self._environment(home, prefix)
+
+            result = self._run(environment, with_kokoro=True)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            calls = uv_log.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(calls), 2)
+            self.assertTrue(calls[0].startswith("venv --python 3.13"))
+            self.assertIn("kokoro-onnx==0.5.0", calls[1])
 
 
 if __name__ == "__main__":

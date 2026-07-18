@@ -22,7 +22,12 @@ class KarabinerProfileTests(unittest.TestCase):
                 self.assertTrue(
                     any(
                         condition.get("type") == "device_if"
-                        and {"is_game_pad": True} in condition.get("identifiers", [])
+                        and {
+                            "is_game_pad": True,
+                            "vendor_id": 11720,
+                            "product_id": 12315,
+                        }
+                        in condition.get("identifiers", [])
                         for condition in conditions
                     )
                 )

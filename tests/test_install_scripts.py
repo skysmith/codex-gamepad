@@ -609,7 +609,7 @@ class InstallScriptSafetyTests(unittest.TestCase):
             self.assertEqual(set(manifest["artifacts"]), {"launcher", "uninstaller"})
             self.assertIn("PYTHONDONTWRITEBYTECODE=1", launcher.read_text(encoding="utf-8"))
 
-    def test_install_enforces_supported_python_and_exact_kokoro_version(self) -> None:
+    def test_install_enforces_supported_python_and_only_requires_kokoro_when_requested(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)
             prefix = home / ".local" / "share" / "codex-gamepad"
@@ -652,6 +652,7 @@ class InstallScriptSafetyTests(unittest.TestCase):
                     str(ROOT / "scripts" / "install-local.sh"),
                     "--python",
                     str(wrong_kokoro),
+                    "--with-kokoro",
                     "--skip-receiver",
                     "--skip-karabiner",
                 ],
@@ -661,8 +662,24 @@ class InstallScriptSafetyTests(unittest.TestCase):
                 env=environment,
             )
             self.assertEqual(result.returncode, 1)
-            self.assertIn("exactly version 0.5.0", result.stderr)
+            self.assertIn("requires kokoro-onnx 0.5.0", result.stderr)
             self.assertFalse(prefix.exists())
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(ROOT / "scripts" / "install-local.sh"),
+                    "--python",
+                    str(wrong_kokoro),
+                    "--skip-receiver",
+                    "--skip-karabiner",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_uninstall_refuses_unmarked_prefix(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

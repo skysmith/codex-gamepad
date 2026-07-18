@@ -74,7 +74,7 @@ PYTHON_BIN=$(find_python 2>/dev/null || true)
 if [[ -n "$PYTHON_BIN" && -x "$PYTHON_BIN" ]]; then
   pass "Python is available for safe plist/JSON inspection."
 else
-  fail "Python 3 is unavailable; the local Kokoro installation requires it."
+  fail "Python 3 is unavailable; Codex Gamepad requires it for safe local inspection."
   PYTHON_BIN=
 fi
 
@@ -136,8 +136,8 @@ else
 fi
 
 NAVIGATION_DESCRIPTION='Codex Gamepad — navigation (8BitDo Ultimate 2C)'
-RECEIVER_DESCRIPTION='Codex Gamepad — Kokoro speak/stop (Karabiner 16 receiver)'
-LEGACY_DESCRIPTION='Codex Gamepad — Kokoro speak/stop (legacy shell fallback; do not enable with receiver rule)'
+RECEIVER_DESCRIPTION='Codex Gamepad — speak/stop (Karabiner 16 receiver)'
+LEGACY_DESCRIPTION='Codex Gamepad — speak/stop (legacy shell fallback; do not enable with receiver rule)'
 
 if [[ ! -e "$KARABINER_CONFIG" ]]; then
   warn "Karabiner's user configuration is not present yet; open the app once, then enable both Codex Gamepad rules."
@@ -190,9 +190,9 @@ PY
       fail "The navigation rule is not enabled in the Codex controller profile."
     fi
     if ((RECEIVER_ENABLED)); then
-      pass "The Karabiner 16 Kokoro receiver rule is enabled in the Codex controller profile."
+      pass "The Karabiner 16 speech receiver rule is enabled in the Codex controller profile."
     else
-      fail "The Karabiner 16 Kokoro receiver rule is not enabled in the Codex controller profile."
+      fail "The Karabiner 16 speech receiver rule is not enabled in the Codex controller profile."
     fi
     if ((LEGACY_ENABLED)); then
       fail "The legacy shell rule is also enabled; disable it to avoid duplicate speech triggers."
@@ -409,9 +409,9 @@ else
   # This path returns before Codex task selection and never initializes the
   # model, synthesizes speech, or launches an audio player.
   if "$LAUNCHER" --check-speech-runtime >/dev/null 2>&1; then
-    pass "The local Kokoro assets are present and its Python dependencies import successfully."
+    pass "The configured local speech backend is ready."
   else
-    fail "The local Kokoro speech runtime is incomplete; install the model, voices, and Python dependencies."
+    fail "The configured local speech backend is incomplete; repair it in Codex Gamepad Setup."
   fi
   # Do not capture, parse, or repeat this output. The launcher promises a
   # metadata-only dry run, and redirecting both streams also protects against

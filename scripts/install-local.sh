@@ -10,8 +10,13 @@ PYTHON_CONFIGURED=0
 [[ -n "$PYTHON" ]] && PYTHON_CONFIGURED=1
 DRY_RUN=0
 CREATE_VENV=0
+WITH_KOKORO=0
 SKIP_RECEIVER=0
 SKIP_KARABINER=0
+ENABLE_MANAGED_RULES=0
+UV_BIN=${CODEX_GAMEPAD_UV:-}
+RECEIVER_BINARY=
+PROFILE_SOURCE=
 KARABINER_CLI=${CODEX_GAMEPAD_KARABINER_CLI:-"/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"}
 KARABINER_CONFIG=${CODEX_GAMEPAD_KARABINER_CONFIG:-"$HOME/.config/karabiner/karabiner.json"}
 RUNTIME_DIR="$HOME/Library/Application Support/Codex Gamepad"
@@ -100,7 +105,7 @@ cleanup_install_attempt() {
 trap cleanup_install_attempt EXIT
 
 usage() {
-  echo "Usage: $0 [--dry-run] [--python PATH] [--create-venv] [--skip-receiver] [--skip-karabiner]"
+  echo "Usage: $0 [--dry-run] [--python PATH] [--create-venv] [--uv PATH] [--with-kokoro] [--receiver-binary PATH] [--profile PATH] [--enable-managed-rules] [--skip-receiver] [--skip-karabiner]"
 }
 
 while (($#)); do
@@ -115,6 +120,24 @@ while (($#)); do
       ;;
     --create-venv)
       CREATE_VENV=1
+      ;;
+    --uv)
+      shift
+      UV_BIN=${1:?--uv requires a path}
+      ;;
+    --with-kokoro)
+      WITH_KOKORO=1
+      ;;
+    --receiver-binary)
+      shift
+      RECEIVER_BINARY=${1:?--receiver-binary requires a path}
+      ;;
+    --profile)
+      shift
+      PROFILE_SOURCE=${1:?--profile requires a path}
+      ;;
+    --enable-managed-rules)
+      ENABLE_MANAGED_RULES=1
       ;;
     --skip-receiver)
       SKIP_RECEIVER=1
@@ -153,6 +176,32 @@ raise SystemExit(0 if (3, 10) <= sys.version_info[:2] < (3, 14) else 1)
 ' >/dev/null 2>&1
 }
 
+if [[ $CREATE_VENV -eq 1 && $PYTHON_CONFIGURED -eq 1 ]]; then
+  echo "--create-venv cannot be combined with --python or CODEX_GAMEPAD_PYTHON." >&2
+  exit 2
+fi
+
+if [[ $CREATE_VENV -eq 1 ]]; then
+  if [[ -z "$UV_BIN" ]]; then
+    UV_BIN=$(command -v uv 2>/dev/null || true)
+  fi
+  if [[ -z "$UV_BIN" || ! -x "$UV_BIN" ]]; then
+    echo "uv is required for --create-venv; pass --uv PATH or install uv." >&2
+    exit 1
+  fi
+  PYTHON="$PREFIX/venv/bin/python"
+  if [[ $DRY_RUN -eq 0 && ! -x "$PYTHON" ]]; then
+    if [[ ! -e "$PREFIX/venv" && ! -L "$PREFIX/venv" ]]; then
+      VENV_CREATED_THIS_INVOCATION=1
+    fi
+    mkdir -p "$PREFIX"
+    "$UV_BIN" venv --python 3.13 "$PREFIX/venv"
+  fi
+  if [[ $DRY_RUN -eq 0 && $WITH_KOKORO -eq 1 ]]; then
+    "$UV_BIN" pip install --python "$PYTHON" 'kokoro-onnx==0.5.0' 'soundfile>=0.12,<1'
+  fi
+fi
+
 if [[ -z "$PYTHON" ]]; then
   candidates=(
     "$PREFIX/venv/bin/python"
@@ -163,27 +212,11 @@ if [[ -z "$PYTHON" ]]; then
     fi
   done
   for candidate in "${candidates[@]}"; do
-    if is_supported_python "$candidate" && has_kokoro "$candidate"; then
+    if is_supported_python "$candidate" && { [[ $WITH_KOKORO -eq 0 ]] || has_kokoro "$candidate"; }; then
       PYTHON=$candidate
       break
     fi
   done
-fi
-
-if [[ -z "$PYTHON" && $CREATE_VENV -eq 1 ]]; then
-  if ! command -v uv >/dev/null 2>&1; then
-    echo "uv is required for --create-venv; install uv or pass --python PATH." >&2
-    exit 1
-  fi
-  PYTHON="$PREFIX/venv/bin/python"
-  if [[ $DRY_RUN -eq 0 ]]; then
-    if [[ ! -e "$PREFIX/venv" && ! -L "$PREFIX/venv" ]]; then
-      VENV_CREATED_THIS_INVOCATION=1
-    fi
-    mkdir -p "$PREFIX"
-    uv venv --python 3.13 "$PREFIX/venv"
-    uv pip install --python "$PYTHON" 'kokoro-onnx==0.5.0' 'soundfile>=0.12,<1'
-  fi
 fi
 
 if [[ $PYTHON_CONFIGURED -eq 1 ]] && ! is_supported_python "$PYTHON"; then
@@ -192,14 +225,18 @@ if [[ $PYTHON_CONFIGURED -eq 1 ]] && ! is_supported_python "$PYTHON"; then
 fi
 
 if [[ -z "$PYTHON" ]]; then
-  echo "A Python 3.10–3.13 environment with kokoro-onnx and soundfile is required." >&2
+  echo "A Python 3.10–3.13 environment is required." >&2
   echo "Pass --python PATH or use --create-venv." >&2
   exit 1
 fi
-if [[ $DRY_RUN -eq 0 ]] && { ! is_supported_python "$PYTHON" || ! has_kokoro "$PYTHON"; }; then
-  echo "A Python 3.10–3.13 environment with kokoro-onnx and soundfile is required." >&2
-  echo "kokoro-onnx must be exactly version 0.5.0." >&2
+if [[ $DRY_RUN -eq 0 ]] && ! is_supported_python "$PYTHON"; then
+  echo "A Python 3.10–3.13 environment is required." >&2
   echo "Pass --python PATH or use --create-venv." >&2
+  exit 1
+fi
+if [[ $DRY_RUN -eq 0 && $WITH_KOKORO -eq 1 ]] && ! has_kokoro "$PYTHON"; then
+  echo "The optional Kokoro backend requires kokoro-onnx 0.5.0 and soundfile." >&2
+  echo "Use --create-venv --with-kokoro, or pass a compatible --python PATH." >&2
   exit 1
 fi
 
@@ -242,6 +279,14 @@ if [[ $SKIP_KARABINER -eq 0 ]]; then
     echo "Automatic game handoff skipped: Karabiner must be opened once and its CLI must be available." >&2
   fi
 fi
+if [[ -n "$PROFILE_SOURCE" ]]; then
+  if [[ ! -f "$PROFILE_SOURCE" || -L "$PROFILE_SOURCE" ]]; then
+    echo "--profile must name a regular non-symlink JSON file." >&2
+    exit 2
+  fi
+else
+  PROFILE_SOURCE="$ROOT/karabiner/codex-gamepad.json"
+fi
 if [[ $MODE_SWITCHING -eq 0 && ( -e "$PROFILE_STATE" || -L "$PROFILE_STATE" ) ]]; then
   echo "Existing Codex Gamepad profile ownership requires a normal Karabiner-enabled reinstall or uninstall." >&2
   exit 1
@@ -272,7 +317,7 @@ OWNERSHIP_ARTIFACTS=(
 
 if [[ $SKIP_KARABINER -eq 0 ]]; then
   "$UTILITY_PYTHON" "$ROOT/scripts/render_profile.py" \
-    "$ROOT/karabiner/codex-gamepad.json" \
+    "$PROFILE_SOURCE" \
     "$INSTALL_TEMP/codex-gamepad.json" \
     --endpoint "$ENDPOINT" \
     --speaker "$BIN_DIR/codex-speak-last"
@@ -280,11 +325,16 @@ if [[ $SKIP_KARABINER -eq 0 ]]; then
     --regular karabiner_rule "$RULE" "$INSTALL_TEMP/codex-gamepad.json" 644
   )
   if [[ $MODE_SWITCHING -eq 1 ]]; then
-    "$UTILITY_PYTHON" "$ROOT/scripts/configure_gamepad_profiles.py" \
-      --check \
+    PROFILE_CHECK_ARGS=(
+      --check
       --config "$KARABINER_CONFIG" \
       --state "$PROFILE_STATE" \
       --rules-file "$INSTALL_TEMP/codex-gamepad.json"
+    )
+    if [[ $ENABLE_MANAGED_RULES -eq 1 ]]; then
+      PROFILE_CHECK_ARGS+=(--enable-managed-rules)
+    fi
+    "$UTILITY_PYTHON" "$ROOT/scripts/configure_gamepad_profiles.py" "${PROFILE_CHECK_ARGS[@]}"
   fi
 fi
 
@@ -316,12 +366,20 @@ fi
   "${OWNERSHIP_ARTIFACTS[@]}"
 
 if [[ $SKIP_RECEIVER -eq 0 ]]; then
-  if ! command -v swift >/dev/null 2>&1; then
-    echo "Swift/Xcode Command Line Tools are required unless --skip-receiver is used." >&2
-    exit 1
-  fi
-  if [[ $DRY_RUN -eq 0 ]]; then
-    swift build -c release --package-path "$ROOT/receiver"
+  if [[ -n "$RECEIVER_BINARY" ]]; then
+    if [[ ! -f "$RECEIVER_BINARY" || ! -x "$RECEIVER_BINARY" ]]; then
+      echo "--receiver-binary must name an executable file." >&2
+      exit 2
+    fi
+  else
+    if ! command -v swift >/dev/null 2>&1; then
+      echo "Swift/Xcode Command Line Tools are required unless --receiver-binary or --skip-receiver is used." >&2
+      exit 1
+    fi
+    RECEIVER_BINARY="$ROOT/receiver/.build/release/codex-gamepad-receiver"
+    if [[ $DRY_RUN -eq 0 ]]; then
+      swift build -c release --package-path "$ROOT/receiver"
+    fi
   fi
 fi
 
@@ -349,7 +407,7 @@ if [[ $SKIP_RECEIVER -eq 0 ]]; then
   echo "Receiver: $PREFIX/bin/codex-gamepad-receiver"
   if [[ $DRY_RUN -eq 0 ]]; then
     install -m 755 \
-      "$ROOT/receiver/.build/release/codex-gamepad-receiver" \
+      "$RECEIVER_BINARY" \
       "$PREFIX/bin/codex-gamepad-receiver"
   fi
 fi
@@ -362,10 +420,15 @@ if [[ $DRY_RUN -eq 0 && ( $SKIP_KARABINER -eq 0 || $INSTALL_LAUNCH_AGENT -eq 1 )
   mkdir -p "$RUNTIME_DIR"
   chmod 700 "$RUNTIME_DIR"
   if [[ $SKIP_KARABINER -eq 0 && $MODE_SWITCHING -eq 1 ]]; then
-    "$PYTHON" "$ROOT/scripts/configure_gamepad_profiles.py" \
+    PROFILE_CONFIGURE_ARGS=(
       --config "$KARABINER_CONFIG" \
       --state "$PROFILE_STATE" \
       --rules-file "$INSTALL_TEMP/codex-gamepad.json"
+    )
+    if [[ $ENABLE_MANAGED_RULES -eq 1 ]]; then
+      PROFILE_CONFIGURE_ARGS+=(--enable-managed-rules)
+    fi
+    "$PYTHON" "$ROOT/scripts/configure_gamepad_profiles.py" "${PROFILE_CONFIGURE_ARGS[@]}"
   fi
 fi
 
@@ -398,5 +461,9 @@ fi
 if [[ $DRY_RUN -eq 1 ]]; then
   echo "Dry run complete. No installation files or settings were changed."
 else
-  echo "Install complete. Enable the navigation rule and exactly one Kokoro rule in Karabiner."
+  if [[ $ENABLE_MANAGED_RULES -eq 1 ]]; then
+    echo "Install complete. Controller rules are enabled in the Codex Controller profile."
+  else
+    echo "Install complete. Enable the navigation and speak/stop receiver rules in Karabiner."
+  fi
 fi

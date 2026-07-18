@@ -28,6 +28,27 @@ class FakeBackend:
 
 
 class TTSTests(unittest.TestCase):
+    def test_system_speech_readiness_does_not_synthesize_text(self) -> None:
+        completed = SimpleNamespace(returncode=0)
+        with (
+            mock.patch.object(tts.Path, "is_file", return_value=True),
+            mock.patch("codex_gamepad.tts.subprocess.run", return_value=completed) as run,
+        ):
+            tts.check_system_speech_readiness()
+        self.assertEqual(run.call_args.args[0], ["/usr/bin/say", "-v", "?"])
+
+    def test_system_speech_sends_private_text_over_stdin(self) -> None:
+        player = mock.Mock()
+        player.returncode = 0
+        with (
+            mock.patch.object(tts.Path, "is_file", return_value=True),
+            mock.patch("codex_gamepad.tts.subprocess.Popen", return_value=player) as popen,
+        ):
+            tts.speak_system(["Private synthetic response."], voice="Samantha", rate=210)
+        self.assertEqual(popen.call_args.args[0], ["/usr/bin/say", "-v", "Samantha", "-r", "210"])
+        self.assertNotIn("Private synthetic response.", popen.call_args.args[0])
+        player.communicate.assert_called_once_with(b"Private synthetic response.")
+
     def test_readiness_checks_assets_and_python_apis_without_loading_model(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

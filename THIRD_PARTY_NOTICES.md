@@ -1,6 +1,14 @@
 # Third-party notices
 
-Codex Gamepad does not vendor these dependencies or model files, but its optional local speech path interoperates with them.
+Codex Gamepad's setup app bundles uv. The optional speech path interoperates with the other dependencies and model files below without bundling them.
+
+## uv (bundled in the Apple Silicon setup app)
+
+The setup app bundles the arm64 `uv` executable to create an isolated Python runtime. uv is distributed under the Apache License 2.0 or MIT License, at the user's option.
+
+- Project: `astral-sh/uv`
+- Version bundled by the v0.1 release workflow: 0.11.14
+- Source and licenses: https://github.com/astral-sh/uv
 
 ## Kokoro model
 

@@ -14,11 +14,11 @@ from codex_gamepad.cli import main
 class CLITests(unittest.TestCase):
     def test_speech_runtime_check_does_not_load_a_response(self) -> None:
         with (
-            mock.patch("codex_gamepad.cli.check_kokoro_readiness") as readiness,
+            mock.patch("codex_gamepad.cli.check_system_speech_readiness") as readiness,
             mock.patch("codex_gamepad.cli._load_reply") as load_reply,
         ):
             main(["--check-speech-runtime"])
-        readiness.assert_called_once_with(None, None)
+        readiness.assert_called_once_with()
         load_reply.assert_not_called()
 
     def test_speech_runtime_check_uses_configured_assets(self) -> None:
@@ -28,7 +28,11 @@ class CLITests(unittest.TestCase):
             voices = root / "voices.bin"
             config = root / "config.json"
             config.write_text(
-                json.dumps({"model": str(model), "voices": str(voices)}),
+                json.dumps({
+                    "speech_backend": "kokoro",
+                    "model": str(model),
+                    "voices": str(voices),
+                }),
                 encoding="utf-8",
             )
             with mock.patch(
@@ -36,6 +40,16 @@ class CLITests(unittest.TestCase):
             ) as readiness:
                 main(["--config", str(config), "--check-speech-runtime"])
             readiness.assert_called_once_with(str(model), str(voices))
+
+    def test_apple_speech_uses_configured_voice_and_rate(self) -> None:
+        rollout = Path(__file__).parent / "fixtures" / "root-rollout.jsonl"
+        with mock.patch("codex_gamepad.cli.speak_system") as speak:
+            main([
+                "--rollout", str(rollout),
+                "--system-voice", "Samantha",
+                "--system-rate", "210",
+            ])
+        self.assertEqual(speak.call_args.kwargs, {"voice": "Samantha", "rate": 210})
 
     def test_dry_run_never_prints_response_text(self) -> None:
         rollout = Path(__file__).parent / "fixtures" / "root-rollout.jsonl"

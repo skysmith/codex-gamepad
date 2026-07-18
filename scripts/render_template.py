@@ -14,6 +14,10 @@ def main() -> None:
     parser.add_argument("output", type=Path)
     parser.add_argument("--mode", choices=("raw", "shell", "xml"), default="raw")
     parser.add_argument("replacements", nargs="*")
+    # The installer and tests place --mode between the fixed paths and the
+    # variable-length replacement list.  parse_args() stops assigning values
+    # to a trailing nargs="*" positional after it encounters an option on
+    # Python 3.11, so accept the documented interspersed form explicitly.
     args = parser.parse_intermixed_args()
 
     values: dict[str, str] = {}

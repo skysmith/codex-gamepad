@@ -18,9 +18,11 @@ from .text import chunk_for_kokoro, clean_for_speech
 from .tts import (
     KokoroBackend,
     check_kokoro_readiness,
+    check_system_speech_readiness,
     find_kokoro_assets,
     render_to_file,
     speak_streaming,
+    speak_system,
     stop_active_player,
 )
 
@@ -32,7 +34,7 @@ def build_parser(defaults: dict[str, object] | None = None) -> argparse.Argument
     defaults = defaults or {}
     parser = argparse.ArgumentParser(
         prog="codex-speak-last",
-        description="Speak the last completed Codex Desktop response with local Kokoro.",
+        description="Speak the last completed Codex Desktop response with a local voice.",
     )
     parser.add_argument("--config", help="Path to a Codex Gamepad JSON config")
     parser.add_argument(
@@ -53,6 +55,23 @@ def build_parser(defaults: dict[str, object] | None = None) -> argparse.Argument
         action="store_true",
         default=defaults.get("compat_rollout_fallback", False),
         help="Use private rollout JSONL only if app-server fails",
+    )
+    parser.add_argument(
+        "--speech-backend",
+        choices=("apple", "kokoro"),
+        default=defaults.get("speech_backend", "apple"),
+        help="Speech engine (default: apple)",
+    )
+    parser.add_argument(
+        "--system-voice",
+        default=defaults.get("system_voice"),
+        help="Apple system voice (default: the macOS selected voice)",
+    )
+    parser.add_argument(
+        "--system-rate",
+        type=int,
+        default=defaults.get("system_rate", 200),
+        help="Apple speech rate in words per minute (default: 200)",
     )
     parser.add_argument(
         "--model", default=defaults.get("model"), help="Path to kokoro-v1.0.onnx"
@@ -88,7 +107,7 @@ def build_parser(defaults: dict[str, object] | None = None) -> argparse.Argument
     parser.add_argument(
         "--check-speech-runtime",
         action="store_true",
-        help="Check local Kokoro assets and imports without reading or synthesizing a response",
+        help="Check the configured speech engine without reading or synthesizing a response",
     )
     parser.add_argument(
         "--require-frontmost",
@@ -141,14 +160,19 @@ def _install_signal_handlers() -> None:
 
 def _run(args: argparse.Namespace) -> None:
     if args.check_speech_runtime:
-        check_kokoro_readiness(args.model, args.voices)
+        if args.speech_backend == "kokoro":
+            check_kokoro_readiness(args.model, args.voices)
+        else:
+            check_system_speech_readiness()
         return
     if args.require_frontmost:
         frontmost = frontmost_bundle_id()
         if frontmost != CODEX_BUNDLE_ID:
             raise CodexGamepadError("Codex is not the frontmost app; speech was ignored.")
-    if not 0.5 <= args.speed <= 2.0:
+    if args.speech_backend == "kokoro" and not 0.5 <= args.speed <= 2.0:
         raise CodexGamepadError("Kokoro speed must be between 0.5 and 2.0.")
+    if args.speech_backend == "apple" and not 80 <= args.system_rate <= 500:
+        raise CodexGamepadError("Apple speech rate must be between 80 and 500.")
     if not 100 <= args.max_characters <= 100_000:
         raise CodexGamepadError("Maximum characters must be between 100 and 100000.")
 
@@ -173,6 +197,12 @@ def _run(args: argparse.Namespace) -> None:
                 indent=2,
             )
         )
+        return
+
+    if args.speech_backend == "apple":
+        if args.output:
+            raise CodexGamepadError("WAV output requires the optional Kokoro backend.")
+        speak_system(chunks, voice=args.system_voice, rate=args.system_rate)
         return
 
     model_path, voices_path = find_kokoro_assets(args.model, args.voices)

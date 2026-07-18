@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 NAVIGATION = "Codex Gamepad — navigation (8BitDo Ultimate 2C)"
-RECEIVER = "Codex Gamepad — Kokoro speak/stop (Karabiner 16 receiver)"
+RECEIVER = "Codex Gamepad — speak/stop (Karabiner 16 receiver)"
 
 
 class PreflightTests(unittest.TestCase):
@@ -130,9 +130,7 @@ class PreflightTests(unittest.TestCase):
         self._executable(
             launcher,
             'if [[ "$1" == "--check-speech-runtime" ]]; then\n'
-            '  [[ -f "$HOME/.local/share/codex-gamepad/models/kokoro-v1.0.onnx" '
-            '&& -f "$HOME/.local/share/codex-gamepad/models/voices-v1.0.bin" ]]\n'
-            "  exit\n"
+            "  exit 0\n"
             "fi\n"
             "printf 'PRIVATE RESPONSE MUST NOT LEAK\\n'\n"
             "exit 0\n",
@@ -196,7 +194,7 @@ class PreflightTests(unittest.TestCase):
             ):
                 self.assertNotIn(secret, result.stdout + result.stderr)
 
-    def test_missing_kokoro_assets_are_a_blocker_without_audible_probe(self) -> None:
+    def test_apple_backend_does_not_require_optional_kokoro_assets(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             environment, listener = self._fixture(root)
@@ -218,9 +216,35 @@ class PreflightTests(unittest.TestCase):
                 )
             finally:
                 listener.close()
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn(
+                "PASS  The configured local speech backend is ready",
+                result.stdout,
+            )
+            self.assertNotIn("PRIVATE RESPONSE", result.stdout + result.stderr)
+
+    def test_configured_speech_backend_failure_is_a_blocker_without_audible_probe(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            environment, listener = self._fixture(root)
+            self._executable(
+                Path(environment["CODEX_GAMEPAD_LAUNCHER"]),
+                '[[ "$1" == "--check-speech-runtime" ]] && exit 1\n'
+                "printf 'PRIVATE RESPONSE MUST NOT LEAK\\n'\n",
+            )
+            try:
+                result = subprocess.run(
+                    ["bash", str(ROOT / "scripts" / "preflight.sh")],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                )
+            finally:
+                listener.close()
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "FAIL  The local Kokoro speech runtime is incomplete",
+                "FAIL  The configured local speech backend is incomplete",
                 result.stdout,
             )
             self.assertNotIn("PRIVATE RESPONSE", result.stdout + result.stderr)

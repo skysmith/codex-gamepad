@@ -18,6 +18,7 @@ from scripts.configure_gamepad_profiles import (
     CODEX_PROFILE_NAME,
     DEVICE_IDENTIFIERS,
     GAME_PROFILE_NAME,
+    LEGACY_KOKORO_RECEIVER_RULE_DESCRIPTION,
     LEGACY_RECEIVER_RULE_DESCRIPTION,
     MANAGED_PROFILE_NAMES,
     NAVIGATION_RULE_DESCRIPTION,
@@ -94,12 +95,12 @@ def write_rules_file(path: Path) -> dict:
 
 
 class GamepadProfileConfigurationTests(unittest.TestCase):
-    def test_receiver_rule_descriptions_keep_the_public_name_and_migrate_the_preview_name(
+    def test_receiver_rule_descriptions_are_backend_neutral_and_keep_legacy_names(
         self,
     ) -> None:
         self.assertEqual(
             RECEIVER_RULE_DESCRIPTION,
-            "Codex Gamepad — Kokoro speak/stop (Karabiner 16 receiver)",
+            "Codex Gamepad — speak/stop (Karabiner 16 receiver)",
         )
         self.assertEqual(
             LEGACY_RECEIVER_RULE_DESCRIPTION,
@@ -107,9 +108,10 @@ class GamepadProfileConfigurationTests(unittest.TestCase):
         )
         self.assertEqual(
             SHELL_FALLBACK_RULE_DESCRIPTION,
-            "Codex Gamepad — Kokoro speak/stop "
+            "Codex Gamepad — speak/stop "
             "(legacy shell fallback; do not enable with receiver rule)",
         )
+        self.assertIn("Kokoro speak/stop", LEGACY_KOKORO_RECEIVER_RULE_DESCRIPTION)
 
     def test_creates_profiles_from_selected_profile_and_preserves_unrelated_data(self) -> None:
         keyboard = {
@@ -218,8 +220,8 @@ class GamepadProfileConfigurationTests(unittest.TestCase):
                 "preview-receiver",
             )
             stale_public_receiver = managed_rule(
-                RECEIVER_RULE_DESCRIPTION,
-                "stale-public-receiver",
+                LEGACY_KOKORO_RECEIVER_RULE_DESCRIPTION,
+                "stale-kokoro-receiver",
             )
             unrelated_rule = managed_rule("Keep this rule", "unrelated")
             write_config(
@@ -323,6 +325,54 @@ class GamepadProfileConfigurationTests(unittest.TestCase):
                 self.assertEqual(
                     profile_named(configured, name)["complex_modifications"]["rules"],
                     [unrelated_rule],
+                )
+
+    def test_enable_managed_rules_installs_exact_supported_pair(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config_path = root / "karabiner.json"
+            state_path = root / "ownership.json"
+            rules_path = root / "codex-gamepad.json"
+            unrelated_rule = managed_rule("Keep this rule", "unrelated")
+            old_receiver = managed_rule(
+                LEGACY_KOKORO_RECEIVER_RULE_DESCRIPTION,
+                "old-receiver",
+            )
+            write_config(
+                config_path,
+                {
+                    "profiles": [
+                        {
+                            "name": "Default",
+                            "selected": True,
+                            "complex_modifications": {
+                                "rules": [unrelated_rule, old_receiver]
+                            },
+                        }
+                    ]
+                },
+            )
+            expected = write_rules_file(rules_path)
+
+            self.assertTrue(
+                configure_path(
+                    config_path,
+                    state_path,
+                    rules_file=rules_path,
+                    enable_managed_rules=True,
+                )
+            )
+
+            configured = json.loads(config_path.read_text(encoding="utf-8"))
+            for name in (CODEX_PROFILE_NAME, GAME_PROFILE_NAME):
+                rules = profile_named(configured, name)["complex_modifications"]["rules"]
+                self.assertEqual(
+                    rules,
+                    [
+                        unrelated_rule,
+                        expected[NAVIGATION_RULE_DESCRIPTION],
+                        expected[RECEIVER_RULE_DESCRIPTION],
+                    ],
                 )
 
     def test_rules_file_refreshes_an_enabled_shell_fallback(self) -> None:
